@@ -229,7 +229,7 @@ def _link_label(url: str) -> str:
     parsed = urlparse(url)
     path = (parsed.path or "").strip("/")
     if not path:
-        return "Inicio Montessori México"
+        return "Inicio Montessori"
     parts = [p for p in path.split("/") if p][:4]
     if not parts:
         return "Recurso recomendado"
@@ -287,13 +287,13 @@ def _extract_focus_keyphrase(data: dict, title: str, tags: list[str]) -> str:
         words = tags[0].split()
         return _truncate(" ".join(words[: config.FOCUS_KEYPHRASE_MAX_WORDS]), 60)
     words = re.findall(r"[A-Za-zÁÉÍÓÚáéíóúÑñÜü0-9]+", title)
-    phrase = " ".join(words[: config.FOCUS_KEYPHRASE_MAX_WORDS]) if words else "Montessori México"
+    phrase = " ".join(words[: config.FOCUS_KEYPHRASE_MAX_WORDS]) if words else "Educación Montessori"
     return _truncate(phrase, 60)
 
 
 def _normalize_generated_post(data: dict) -> GeneratedPost:
     title = _truncate(
-        data.get("title", "Actualidad Montessori en México"),
+        data.get("title", "Actualidad Montessori Internacional"),
         config.POST_TITLE_MAX_LEN,
     )
 
@@ -455,9 +455,9 @@ if __name__ == "__main__":
     config.setup_logging()
     config.validate()
     test = SearchResult(
-        title="Nueva escuela Montessori abre en CDMX",
+        title="Nueva escuela Montessori abre en Europa",
         url="https://example.com/noticia",
-        snippet="Una nueva escuela con método Montessori abrirá sus puertas en la Ciudad de México para el ciclo 2026.",
+        snippet="Una nueva escuela con método Montessori abrirá sus puertas para el ciclo 2026.",
     )
     post = generate_post(test)
     if post:
