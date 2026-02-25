@@ -73,6 +73,9 @@ Variables principales:
 - `TRUSEO_MIN_SCORE`: mínimo TruSEO-like para publicar automáticamente (default `70`).
 - `HEADLINE_MIN_SCORE`: mínimo Headline score para publicar automáticamente (default `65`).
 - `SEO_STRICT_PHRASE`: `1` para coincidencia estricta de focus keyphrase; `0` modo más permisivo.
+- `NOTIFICATIONS_ENABLED`: activa avisos al crear borradores (default `1`).
+- `NOTIFY_WEBHOOK_URL`: webhook para recibir alertas (Slack/Discord/Make/n8n, opcional).
+- `TELEGRAM_BOT_TOKEN` y `TELEGRAM_CHAT_ID`: canal alterno de alertas por Telegram.
 - `SEO_TITLE_MAX_LEN`: máximo de caracteres para SEO title (default `60`).
 - `SEO_DESCRIPTION_MAX_LEN`: máximo de caracteres para meta description (default `155`).
 - `EXCERPT_MAX_LEN`: máximo de caracteres para excerpt (default `160`).
@@ -153,6 +156,7 @@ Ejemplo para correr todos los días a las 08:00:
 ├── source_fetch.py  # Fetch + extracción de contenido de la fuente
 ├── image_gen.py     # Generación de portada con Gemini
 ├── wordpress.py     # Publicación de borradores vía WP REST API
+├── notifier.py      # Envío de alertas al crear borradores
 ├── state.py         # Persistencia SQLite de URLs procesadas
 ├── config.py        # Carga/validación de configuración
 ├── templates/
@@ -183,6 +187,7 @@ Ejemplo para correr todos los días a las 08:00:
 - El scoring penaliza páginas evergreen (home/about/wiki) y prioriza contenido más noticioso/reciente.
 - El SEO gate local calcula `TruSEO-like` y `Headline score`; si no pasan umbral se marca `seo_failed` y no publica.
 - El orden de publicación rota automáticamente por `topic_id` tomando como referencia el último borrador publicado.
+- Cuando se crea un borrador, el sistema puede enviar una notificación con título, autor, puntajes SEO y enlace directo de edición.
 
 ## Licencia
 

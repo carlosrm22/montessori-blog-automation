@@ -14,6 +14,7 @@ from wordpress import upload_media, create_draft
 from source_fetch import enrich_article
 from topics import TopicProfile, load_topics
 from seo_rules import analyze_headline, analyze_truseo, build_slug
+from notifier import notify_draft_created
 
 logger = logging.getLogger(__name__)
 
@@ -215,6 +216,15 @@ def run_topic_pipeline(topic: TopicProfile) -> bool:
     state.mark_processed(
         article.url, title=post.title, score=score,
         wp_post_id=post_id, status="published_draft", topic_id=topic.topic_id,
+    )
+    notify_draft_created(
+        post_id=post_id,
+        title=post.title,
+        topic_name=topic.name,
+        author_name=topic.author_name,
+        edit_url=f"{config.WP_SITE_URL}/wp-admin/post.php?post={post_id}&action=edit",
+        truseo_score=truseo_score,
+        headline_score=headline_score,
     )
     logger.info("=== Pipeline completado: borrador #%d creado ===", post_id)
     return True

@@ -145,6 +145,10 @@ LOCAL_SEO_RULES_ENABLED = os.environ.get("LOCAL_SEO_RULES_ENABLED", "1") == "1"
 TRUSEO_MIN_SCORE = int(os.environ.get("TRUSEO_MIN_SCORE", "70"))
 HEADLINE_MIN_SCORE = int(os.environ.get("HEADLINE_MIN_SCORE", "65"))
 SEO_STRICT_PHRASE = os.environ.get("SEO_STRICT_PHRASE", "1") == "1"
+NOTIFICATIONS_ENABLED = os.environ.get("NOTIFICATIONS_ENABLED", "1") == "1"
+NOTIFY_WEBHOOK_URL = os.environ.get("NOTIFY_WEBHOOK_URL", "").strip()
+TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN", "").strip()
+TELEGRAM_CHAT_ID = os.environ.get("TELEGRAM_CHAT_ID", "").strip()
 SEO_TITLE_MAX_LEN = int(os.environ.get("SEO_TITLE_MAX_LEN", "60"))
 SEO_DESCRIPTION_MAX_LEN = int(os.environ.get("SEO_DESCRIPTION_MAX_LEN", "155"))
 EXCERPT_MAX_LEN = int(os.environ.get("EXCERPT_MAX_LEN", "160"))
