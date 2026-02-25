@@ -46,11 +46,17 @@ def validate() -> None:
             SEARCH_PROVIDER,
         )
         sys.exit(1)
+    if BRAVE_SEARCH_COUNT <= 0:
+        logging.critical("BRAVE_SEARCH_COUNT debe ser mayor a 0")
+        sys.exit(1)
 
 
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")
 SEARCH_PROVIDER = os.environ.get("SEARCH_PROVIDER", "brave").strip().lower()
 BRAVE_SEARCH_API_KEY = os.environ.get("BRAVE_SEARCH_API_KEY", "")
+BRAVE_SEARCH_COUNT = int(os.environ.get("BRAVE_SEARCH_COUNT", "20"))
+BRAVE_SEARCH_COUNTRY = os.environ.get("BRAVE_SEARCH_COUNTRY", "").strip()
+BRAVE_SEARCH_LANG = os.environ.get("BRAVE_SEARCH_LANG", "").strip()
 GOOGLE_CSE_KEY = os.environ.get("GOOGLE_CSE_KEY", "")
 GOOGLE_CSE_CX = os.environ.get("GOOGLE_CSE_CX", "")
 WP_SITE_URL = os.environ.get("WP_SITE_URL", "").rstrip("/")
@@ -61,9 +67,14 @@ SEARCH_QUERIES = [
     q.strip()
     for q in os.environ.get(
         "SEARCH_QUERIES",
-        "noticias Montessori Mexico,educación Montessori México 2026,método Montessori novedades",
+        "Montessori,Montessori education,Montessori method,método Montessori,méthode Montessori,Montessori news",
     ).split(",")
     if q.strip()
+]
+EXCLUDED_DOMAINS = [
+    d.strip().lower()
+    for d in os.environ.get("EXCLUDED_DOMAINS", "montessorimexico.org").split(",")
+    if d.strip()
 ]
 
 MIN_USABILITY_SCORE = float(os.environ.get("MIN_USABILITY_SCORE", "0.6"))

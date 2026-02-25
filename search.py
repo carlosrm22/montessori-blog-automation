@@ -3,6 +3,7 @@
 import logging
 import time
 from dataclasses import dataclass
+from urllib.parse import urlparse
 
 import httpx
 
@@ -31,10 +32,12 @@ def _search_brave(query: str, retries: int = 3) -> list[dict]:
     """Execute a Brave Search query with exponential backoff."""
     params = {
         "q": query,
-        "count": 10,
-        "country": "MX",
-        "search_lang": "es",
+        "count": config.BRAVE_SEARCH_COUNT,
     }
+    if config.BRAVE_SEARCH_COUNTRY:
+        params["country"] = config.BRAVE_SEARCH_COUNTRY
+    if config.BRAVE_SEARCH_LANG:
+        params["search_lang"] = config.BRAVE_SEARCH_LANG
     headers = {
         "Accept": "application/json",
         "X-Subscription-Token": config.BRAVE_SEARCH_API_KEY,
@@ -104,11 +107,28 @@ def _extract_fields(item: dict) -> tuple[str, str, str]:
             item.get("link", ""),
             item.get("snippet", ""),
         )
+    extra = item.get("extra_snippets", [])
+    if isinstance(extra, list):
+        extra_text = " ".join(s for s in extra if isinstance(s, str))
+    else:
+        extra_text = ""
     return (
         item.get("title", ""),
         item.get("url", ""),
-        item.get("description", "") or item.get("snippet", ""),
+        item.get("description", "") or item.get("snippet", "") or extra_text,
     )
+
+
+def _is_excluded_url(url: str) -> bool:
+    """Return True if URL hostname belongs to excluded domains."""
+    try:
+        hostname = (urlparse(url).hostname or "").lower()
+    except Exception:
+        return False
+    for domain in config.EXCLUDED_DOMAINS:
+        if hostname == domain or hostname.endswith(f".{domain}"):
+            return True
+    return False
 
 
 def search_all() -> list[SearchResult]:
@@ -122,7 +142,12 @@ def search_all() -> list[SearchResult]:
         items = _search_query(query)
         for item in items:
             title, url, snippet = _extract_fields(item)
-            if not url or url in seen_urls or url in processed_urls:
+            if (
+                not url
+                or _is_excluded_url(url)
+                or url in seen_urls
+                or url in processed_urls
+            ):
                 continue
             seen_urls.add(url)
             results.append(

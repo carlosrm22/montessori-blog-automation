@@ -45,6 +45,10 @@ Variables principales:
 - `GEMINI_API_KEY`: API key de Gemini.
 - `SEARCH_PROVIDER`: proveedor de búsqueda (`brave` por defecto, `google_cse` opcional).
 - `BRAVE_SEARCH_API_KEY`: API key de Brave Search.
+- `BRAVE_SEARCH_COUNT`: cantidad de resultados por query en Brave (default `20`).
+- `BRAVE_SEARCH_COUNTRY`: país para Brave (vacío = sin restricción geográfica).
+- `BRAVE_SEARCH_LANG`: idioma para Brave (vacío = cualquier idioma).
+- `EXCLUDED_DOMAINS`: dominios a excluir de resultados (default `montessorimexico.org`).
 - `GOOGLE_CSE_KEY` y `GOOGLE_CSE_CX`: opcionales, solo si usas `SEARCH_PROVIDER=google_cse`.
 - `WP_SITE_URL`: URL base de WordPress (sin slash final).
 - `WP_USERNAME`: usuario de WordPress.
@@ -119,6 +123,7 @@ Ejemplo para correr cada día a las 08:00:
 - El proyecto evita duplicados al guardar URLs ya procesadas.
 - Si falla generación o publicación, registra estado (`gen_failed`, `wp_failed`, etc.).
 - Categorías y tags en WordPress se resuelven/crean automáticamente.
+- Los resultados de `EXCLUDED_DOMAINS` se filtran para evitar auto-referencias del propio sitio.
 
 ## Licencia
 
