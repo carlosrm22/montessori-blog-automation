@@ -12,6 +12,7 @@ import config
 class TopicProfile:
     topic_id: str
     name: str
+    author_name: str
     queries: list[str]
     categories: list[str]
     min_score: float
@@ -25,6 +26,7 @@ def _normalize_topic(raw: dict) -> TopicProfile:
     if not topic_id:
         raise ValueError("Topic missing 'id'")
     name = str(raw.get("name", topic_id)).strip()
+    author_name = str(raw.get("author_name", "")).strip()
     queries = [str(q).strip() for q in raw.get("queries", []) if str(q).strip()]
     if not queries:
         raise ValueError(f"Topic '{topic_id}' has no queries")
@@ -36,6 +38,7 @@ def _normalize_topic(raw: dict) -> TopicProfile:
     return TopicProfile(
         topic_id=topic_id,
         name=name,
+        author_name=author_name,
         queries=queries,
         categories=categories,
         min_score=min_score,
@@ -49,6 +52,7 @@ def _default_topic() -> TopicProfile:
     return TopicProfile(
         topic_id="montessori_core",
         name="Montessori Core",
+        author_name="",
         queries=config.SEARCH_QUERIES,
         categories=["Educación Montessori"],
         min_score=config.MIN_USABILITY_SCORE,

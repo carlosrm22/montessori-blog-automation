@@ -82,6 +82,7 @@ Variables principales:
 El archivo [`topics.yml`](/home/carlos/montessori-blog-automation/topics.yml) define verticales con:
 
 - `id`, `name`
+- `author_name` (nombre del autor en WordPress para ese tema)
 - `queries`
 - `categories`
 - `min_score`

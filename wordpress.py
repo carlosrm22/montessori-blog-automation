@@ -12,6 +12,7 @@ import config
 from content import GeneratedPost
 
 logger = logging.getLogger(__name__)
+_AUTHOR_CACHE: dict[str, int] = {}
 
 
 def _auth() -> tuple[str, str]:
@@ -38,6 +39,12 @@ def _truncate(text: str, max_len: int) -> str:
     if len(text) <= max_len:
         return text
     return text[:max_len].rsplit(" ", 1)[0] or text[:max_len]
+
+
+def _normalize_name(value: str) -> str:
+    value = unicodedata.normalize("NFKD", value).encode("ascii", "ignore").decode("ascii")
+    value = re.sub(r"[^A-Za-z0-9\s-]", " ", value).lower()
+    return re.sub(r"\s+", " ", value).strip()
 
 
 def _request(
@@ -112,6 +119,67 @@ def _resolve_terms(taxonomy: str, names: list[str]) -> list[int]:
         if term_id:
             ids.append(term_id)
     return ids
+
+
+def _resolve_author_id(author_name: str) -> int | None:
+    """Resolve WordPress user ID from display name/slug."""
+    clean_name = " ".join((author_name or "").split())
+    if not clean_name:
+        return None
+
+    key = _normalize_name(clean_name)
+    if key in _AUTHOR_CACHE:
+        return _AUTHOR_CACHE[key]
+
+    resp = _request(
+        "get",
+        "users",
+        params={"search": clean_name, "per_page": 100},
+        retry_on_500=False,
+    )
+    if not resp:
+        logger.warning("No se pudo resolver autor '%s' (users endpoint no disponible).", clean_name)
+        return None
+
+    try:
+        users = resp.json()
+    except Exception:
+        logger.warning("Respuesta inválida al resolver autor '%s'.", clean_name)
+        return None
+    if not isinstance(users, list) or not users:
+        logger.warning("No se encontró autor en WordPress con nombre '%s'.", clean_name)
+        return None
+
+    exact_match = None
+    fallback_match = None
+    for user in users:
+        values = [
+            str(user.get("name", "")),
+            str(user.get("slug", "")),
+            str(user.get("username", "")),
+            str(user.get("nickname", "")),
+        ]
+        normalized_values = [_normalize_name(v) for v in values if v]
+        if key in normalized_values:
+            exact_match = user
+            break
+        if fallback_match is None and any(key in nv for nv in normalized_values):
+            fallback_match = user
+
+    chosen = exact_match or fallback_match
+    if not chosen:
+        logger.warning("No hubo coincidencia de autor para '%s'.", clean_name)
+        return None
+
+    try:
+        author_id = int(chosen["id"])
+    except Exception:
+        logger.warning("El usuario encontrado para '%s' no tiene ID válido.", clean_name)
+        return None
+
+    _AUTHOR_CACHE[key] = author_id
+    logger.info("Autor '%s' resuelto a user_id=%d", clean_name, author_id)
+    return author_id
 
 
 def _update_media_metadata(
@@ -214,11 +282,12 @@ def _sync_aioseo(post_id: int, post: GeneratedPost) -> None:
 
 
 def create_draft(
-    post: GeneratedPost, media_id: int | None = None
+    post: GeneratedPost, media_id: int | None = None, author_name: str = ""
 ) -> int | None:
     """Create a WordPress draft post. Returns post ID."""
     category_ids = _resolve_terms("categories", post.categories)
     tag_ids = _resolve_terms("tags", post.tags)
+    author_id = _resolve_author_id(author_name)
 
     payload: dict = {
         "title": post.title,
@@ -231,6 +300,13 @@ def create_draft(
     }
     if media_id:
         payload["featured_media"] = media_id
+    if author_id:
+        payload["author"] = author_id
+    elif author_name:
+        logger.warning(
+            "No se pudo asignar autor '%s'. Se publicará con el autor por defecto de la API.",
+            author_name,
+        )
 
     resp = _request("post", "posts", json=payload)
     if resp:

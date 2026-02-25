@@ -1,6 +1,7 @@
 topics:
   - id: montessori_core
     name: Montessori México (Core)
+    author_name: Roxana Muñoz
     queries:
       - "Montessori news"
       - "Montessori México educación"
@@ -19,6 +20,7 @@ topics:
 
   - id: constructivismo
     name: Constructivismo y Aprendizaje Activo
+    author_name: Caridad Roxana Romero Muñoz
     queries:
       - "constructivist education research"
       - "Vygotsky scaffolding classroom"
@@ -37,6 +39,7 @@ topics:
 
   - id: educacion_humanista
     name: Educación Humanista y Desarrollo Socioemocional
+    author_name: Carlos Alfonso Romero
     queries:
       - "humanistic education classroom"
       - "social emotional learning evidence schools"

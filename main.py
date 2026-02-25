@@ -91,7 +91,7 @@ def run_topic_pipeline(topic: TopicProfile) -> bool:
         if media_id is None:
             logger.warning("No se pudo subir la imagen, continuando sin imagen destacada")
 
-    post_id = create_draft(post, media_id=media_id)
+    post_id = create_draft(post, media_id=media_id, author_name=topic.author_name)
     if post_id is None:
         logger.error("No se pudo crear el borrador en WordPress.")
         state.mark_processed(
