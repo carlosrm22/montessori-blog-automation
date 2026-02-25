@@ -49,11 +49,18 @@ class GeneratedPost:
     image_alt_text: str
 
 
-def _render_prompt(article: SearchResult) -> str:
+def _render_prompt(
+    article: SearchResult,
+    topic_name: str = "Montessori",
+    topic_writing_guidelines: str = "",
+    template_name: str = "post_prompt.txt",
+) -> str:
     env = Environment(loader=FileSystemLoader(config.TEMPLATES_DIR))
-    template = env.get_template("post_prompt.txt")
+    template = env.get_template(template_name)
     blocked_terms = ", ".join(config.BLOCKED_MENTION_TERMS)
     return template.render(
+        topic_name=topic_name,
+        topic_writing_guidelines=topic_writing_guidelines,
         title=article.title,
         url=article.url,
         snippet=article.snippet,
@@ -222,9 +229,20 @@ def _normalize_generated_post(data: dict) -> GeneratedPost:
     )
 
 
-def generate_post(article: SearchResult, max_retries: int = 2) -> GeneratedPost | None:
+def generate_post(
+    article: SearchResult,
+    max_retries: int = 2,
+    topic_name: str = "Montessori",
+    topic_writing_guidelines: str = "",
+    template_name: str = "post_prompt.txt",
+) -> GeneratedPost | None:
     """Generate an original blog post from a source article."""
-    prompt = _render_prompt(article)
+    prompt = _render_prompt(
+        article,
+        topic_name=topic_name,
+        topic_writing_guidelines=topic_writing_guidelines,
+        template_name=template_name,
+    )
     client = genai.Client(api_key=config.GEMINI_API_KEY)
 
     for attempt in range(max_retries):

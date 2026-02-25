@@ -1,15 +1,17 @@
 # Montessori Blog Automation
 
-Pipeline en Python para automatizar la curación y generación de borradores para un blog Montessori en México.
+Pipeline en Python para automatizar la curación y generación de borradores para un blog editorial por verticales temáticas.
 
 El flujo completo hace lo siguiente:
 
-1. Busca noticias recientes en web abierta con Brave Search API.
-2. Evalúa relevancia con Gemini.
-3. Genera un artículo original en HTML.
-4. Genera imagen de portada optimizada para WordPress.
-5. Publica un borrador en WordPress y sincroniza metadata SEO para AIOSEO.
-6. Guarda estado en SQLite para no reprocesar URLs.
+1. Carga perfiles temáticos desde `topics.yml`.
+2. Busca noticias recientes por tema (Brave Search API).
+3. Evalúa relevancia con Gemini + heurísticas anti-evergreen.
+4. Extrae texto real de la fuente para base factual.
+5. Genera un artículo original en HTML.
+6. Genera imagen de portada optimizada para WordPress.
+7. Publica borrador en WordPress y sincroniza metadata SEO para AIOSEO.
+8. Guarda estado en SQLite por tema para no reprocesar URLs.
 
 ## Requisitos
 
@@ -56,7 +58,9 @@ Variables principales:
 - `WP_SITE_URL`: URL base de WordPress (sin slash final).
 - `WP_USERNAME`: usuario de WordPress.
 - `WP_APP_PASSWORD`: Application Password de WordPress.
-- `SEARCH_QUERIES`: consultas separadas por coma.
+- `SEARCH_QUERIES`: fallback de consultas separadas por coma (solo si falta `topics.yml`).
+- `TOPIC_IDS`: lista separada por coma para correr solo ciertos temas (ej. `montessori_core,constructivismo`).
+- `TOPICS_MAX_POSTS_PER_RUN`: máximo de borradores por corrida.
 - `MIN_USABILITY_SCORE`: umbral mínimo para publicar.
 - `MIN_BODY_WORDS`: mínimo de palabras requeridas para el body (default `600`).
 - `DRY_RUN`: `1` para simular sin publicar; `0` para publicar borradores.
@@ -72,6 +76,18 @@ Variables principales:
 - `WP_IMAGE_MAX_KB`: peso objetivo máximo de imagen.
 - `SOURCE_FETCH_ENABLED`: habilita extracción del texto real de la fuente antes de redactar.
 - `SOURCE_FETCH_MAX_CHARS`: máximo de caracteres extraídos desde la nota origen.
+
+## Topics.yml
+
+El archivo [`topics.yml`](/home/carlos/montessori-blog-automation/topics.yml) define verticales con:
+
+- `id`, `name`
+- `queries`
+- `categories`
+- `min_score`
+- `post_template`
+- `scoring_guidelines`
+- `writing_guidelines`
 
 ## Ejecución
 
@@ -112,6 +128,7 @@ Ejemplo para correr cada día a las 08:00:
 .
 ├── main.py          # Orquestador del pipeline
 ├── search.py        # Búsqueda de noticias (Brave / Google CSE)
+├── topics.py        # Carga y validación de perfiles temáticos
 ├── scorer.py        # Scoring de relevancia con Gemini
 ├── content.py       # Generación de artículo en HTML
 ├── source_fetch.py  # Fetch + extracción de contenido de la fuente
@@ -121,6 +138,7 @@ Ejemplo para correr cada día a las 08:00:
 ├── config.py        # Carga/validación de configuración
 ├── templates/
 │   └── post_prompt.txt
+├── topics.yml        # Configuración editorial por vertical
 ├── data/
 │   ├── blog_state.db
 │   └── images/

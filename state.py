@@ -1,4 +1,4 @@
-"""SQLite state management to avoid processing duplicates."""
+"""SQLite state management by topic to avoid processing duplicates."""
 
 import sqlite3
 import logging
@@ -11,12 +11,14 @@ logger = logging.getLogger(__name__)
 
 _CREATE_TABLE = """
 CREATE TABLE IF NOT EXISTS processed_articles (
-    url TEXT PRIMARY KEY,
+    topic_id TEXT NOT NULL DEFAULT 'default',
+    url TEXT NOT NULL,
     title TEXT,
     score REAL,
     wp_post_id INTEGER,
     status TEXT DEFAULT 'processed',
-    created_at TEXT DEFAULT (datetime('now'))
+    created_at TEXT DEFAULT (datetime('now')),
+    PRIMARY KEY (topic_id, url)
 )
 """
 
@@ -29,10 +31,34 @@ def _connect() -> sqlite3.Connection:
     return conn
 
 
-def is_processed(url: str) -> bool:
+def _migrate_if_needed(conn: sqlite3.Connection) -> None:
+    """Migrate old single-key table to topic-aware schema if needed."""
+    cols = {
+        row[1] for row in conn.execute("PRAGMA table_info(processed_articles)").fetchall()
+    }
+    if "topic_id" in cols:
+        return
+    rows = conn.execute(
+        "SELECT url, title, score, wp_post_id, status, created_at FROM processed_articles"
+    ).fetchall()
+    conn.execute("ALTER TABLE processed_articles RENAME TO processed_articles_old")
+    conn.execute(_CREATE_TABLE)
+    conn.executemany(
+        """INSERT OR REPLACE INTO processed_articles
+           (topic_id, url, title, score, wp_post_id, status, created_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?)""",
+        [("default", *row) for row in rows],
+    )
+    conn.execute("DROP TABLE processed_articles_old")
+    conn.commit()
+
+
+def is_processed(url: str, topic_id: str = "default") -> bool:
     with _connect() as conn:
+        _migrate_if_needed(conn)
         row = conn.execute(
-            "SELECT 1 FROM processed_articles WHERE url = ?", (url,)
+            "SELECT 1 FROM processed_articles WHERE topic_id = ? AND url = ?",
+            (topic_id, url),
         ).fetchone()
         return row is not None
 
@@ -43,21 +69,33 @@ def mark_processed(
     score: float = 0.0,
     wp_post_id: int | None = None,
     status: str = "processed",
+    topic_id: str = "default",
 ) -> None:
     with _connect() as conn:
+        _migrate_if_needed(conn)
         conn.execute(
             """INSERT OR REPLACE INTO processed_articles
-               (url, title, score, wp_post_id, status, created_at)
-               VALUES (?, ?, ?, ?, ?, ?)""",
-            (url, title, score, wp_post_id, status, datetime.now(timezone.utc).isoformat()),
+               (topic_id, url, title, score, wp_post_id, status, created_at)
+               VALUES (?, ?, ?, ?, ?, ?, ?)""",
+            (
+                topic_id, url, title, score, wp_post_id, status,
+                datetime.now(timezone.utc).isoformat(),
+            ),
         )
         conn.commit()
-    logger.info("Marcado como procesado: %s (score=%.2f, wp_id=%s)", url, score, wp_post_id)
+    logger.info(
+        "Marcado como procesado [%s]: %s (score=%.2f, wp_id=%s)",
+        topic_id, url, score, wp_post_id,
+    )
 
 
-def get_all_processed_urls() -> set[str]:
+def get_all_processed_urls(topic_id: str = "default") -> set[str]:
     with _connect() as conn:
-        rows = conn.execute("SELECT url FROM processed_articles").fetchall()
+        _migrate_if_needed(conn)
+        rows = conn.execute(
+            "SELECT url FROM processed_articles WHERE topic_id = ?",
+            (topic_id,),
+        ).fetchall()
         return {row[0] for row in rows}
 
 

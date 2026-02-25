@@ -13,7 +13,10 @@ from search import SearchResult
 
 logger = logging.getLogger(__name__)
 
-SCORING_PROMPT = """Eres un evaluador experto en educación Montessori en México.
+SCORING_PROMPT = """Eres un evaluador experto en educación.
+
+Tema editorial objetivo: {topic_name}
+Lineamientos de evaluación para este tema: {topic_scoring_guidelines}
 
 Evalúa el siguiente artículo/noticia y devuelve un JSON con exactamente estos campos:
 - relevancia: float 0-1 (relevancia para la comunidad Montessori mexicana)
@@ -104,10 +107,16 @@ def _evergreen_penalty(article: SearchResult, tipo: str) -> float:
     return _clamp(penalty, 0.0, 0.65)
 
 
-def score_article(article: SearchResult) -> float | None:
+def score_article(
+    article: SearchResult,
+    topic_name: str = "Montessori",
+    topic_scoring_guidelines: str = "",
+) -> float | None:
     """Score a single article. Returns weighted score or None on failure."""
     prompt = SCORING_PROMPT.format(
-        title=article.title, url=article.url, snippet=article.snippet
+        topic_name=topic_name,
+        topic_scoring_guidelines=topic_scoring_guidelines or "Sin lineamientos adicionales.",
+        title=article.title, url=article.url, snippet=article.snippet,
     )
     try:
         client = genai.Client(api_key=config.GEMINI_API_KEY)
@@ -152,16 +161,26 @@ def score_article(article: SearchResult) -> float | None:
         return None
 
 
-def select_best(articles: list[SearchResult]) -> tuple[SearchResult, float] | None:
+def select_best(
+    articles: list[SearchResult],
+    min_score: float | None = None,
+    topic_name: str = "Montessori",
+    topic_scoring_guidelines: str = "",
+) -> tuple[SearchResult, float] | None:
     """Score all articles and return the best one above threshold."""
+    min_score = min_score if min_score is not None else config.MIN_USABILITY_SCORE
     best: tuple[SearchResult, float] | None = None
     for article in articles:
-        score = score_article(article)
+        score = score_article(
+            article,
+            topic_name=topic_name,
+            topic_scoring_guidelines=topic_scoring_guidelines,
+        )
         if score is None:
             continue
-        if score < config.MIN_USABILITY_SCORE:
+        if score < min_score:
             logger.info("Descartado (score %.2f < %.2f): %s",
-                        score, config.MIN_USABILITY_SCORE, article.title)
+                        score, min_score, article.title)
             continue
         if best is None or score > best[1]:
             best = (article, score)
@@ -169,7 +188,7 @@ def select_best(articles: list[SearchResult]) -> tuple[SearchResult, float] | No
     if best:
         logger.info("Mejor artículo (score %.2f): %s", best[1], best[0].title)
     else:
-        logger.warning("Ningún artículo superó el umbral de %.2f", config.MIN_USABILITY_SCORE)
+        logger.warning("Ningún artículo superó el umbral de %.2f", min_score)
     return best
 
 

@@ -1,0 +1,54 @@
+topics:
+  - id: montessori_core
+    name: Montessori México (Core)
+    queries:
+      - "Montessori news"
+      - "Montessori México educación"
+      - "Montessori preschool study"
+      - "método Montessori novedades"
+    categories:
+      - "Educación Montessori"
+      - "Montessori en México"
+    min_score: 0.65
+    post_template: post_prompt.txt
+    scoring_guidelines: >
+      Prioriza evidencia reciente, estudios, prácticas aplicables y contexto para México.
+      Penaliza contenido comercial genérico y páginas institucionales sin novedad.
+    writing_guidelines: >
+      Conecta hallazgos globales con aplicación concreta para familias y escuelas mexicanas.
+
+  - id: constructivismo
+    name: Constructivismo y Aprendizaje Activo
+    queries:
+      - "constructivist education research"
+      - "Vygotsky scaffolding classroom"
+      - "aprendizaje activo aula evidencia"
+      - "Piaget classroom practice"
+    categories:
+      - "Constructivismo"
+      - "Aprendizaje activo"
+    min_score: 0.62
+    post_template: post_prompt.txt
+    scoring_guidelines: >
+      Prioriza hallazgos verificables sobre diseño de aprendizaje activo,
+      andamiaje, evaluación formativa y transferencia al aula.
+    writing_guidelines: >
+      Explica en lenguaje claro para docentes y familias cómo aplicar principios constructivistas.
+
+  - id: educacion_humanista
+    name: Educación Humanista y Desarrollo Socioemocional
+    queries:
+      - "humanistic education classroom"
+      - "social emotional learning evidence schools"
+      - "educación humanista escuela"
+      - "autonomía estudiantil bienestar escolar"
+    categories:
+      - "Educación humanista"
+      - "Desarrollo socioemocional"
+    min_score: 0.62
+    post_template: post_prompt.txt
+    scoring_guidelines: >
+      Prioriza evidencia sobre autonomía, clima de aula, motivación intrínseca y bienestar.
+      Evita enfoques pseudocientíficos o afirmaciones sin sustento.
+    writing_guidelines: >
+      Mantén tono práctico y riguroso, con recomendaciones aplicables en contexto escolar mexicano.

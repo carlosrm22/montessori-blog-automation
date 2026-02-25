@@ -163,13 +163,17 @@ def _has_blocked_source_mentions(title: str, url: str, snippet: str) -> bool:
     return False
 
 
-def search_all() -> list[SearchResult]:
-    """Run all configured queries, deduplicate, filter already processed."""
-    processed_urls = state.get_all_processed_urls()
+def search_all(
+    queries: list[str] | None = None,
+    topic_id: str = "default",
+) -> list[SearchResult]:
+    """Run queries, deduplicate, filter already processed for a topic."""
+    queries = queries or config.SEARCH_QUERIES
+    processed_urls = state.get_all_processed_urls(topic_id=topic_id)
     seen_urls: set[str] = set()
     results: list[SearchResult] = []
 
-    for query in config.SEARCH_QUERIES:
+    for query in queries:
         logger.info("Buscando (%s): '%s'", config.SEARCH_PROVIDER, query)
         items = _search_query(query)
         for item in items:

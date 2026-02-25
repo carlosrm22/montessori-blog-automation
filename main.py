@@ -11,22 +11,30 @@ from content import generate_post
 from image_gen import generate_cover_image
 from wordpress import upload_media, create_draft
 from source_fetch import enrich_article
+from topics import TopicProfile, load_topics
 
 logger = logging.getLogger(__name__)
 
 
-def run_pipeline() -> bool:
-    """Execute the full pipeline. Returns True if a post was created."""
+def run_topic_pipeline(topic: TopicProfile) -> bool:
+    """Execute full pipeline for one topic. Returns True if a post was created."""
+    logger.info("=== Topic: %s (%s) ===", topic.name, topic.topic_id)
+
     # 1. Search
     logger.info("=== Paso 1: Búsqueda de noticias ===")
-    results = search_all()
+    results = search_all(queries=topic.queries, topic_id=topic.topic_id)
     if not results:
         logger.info("No se encontraron noticias nuevas. Finalizando.")
         return False
 
     # 2. Score and select best
     logger.info("=== Paso 2: Evaluación de relevancia (%d artículos) ===", len(results))
-    best = select_best(results)
+    best = select_best(
+        results,
+        min_score=topic.min_score,
+        topic_name=topic.name,
+        topic_scoring_guidelines=topic.scoring_guidelines,
+    )
     if best is None:
         logger.info("Ningún artículo alcanzó el umbral de calidad. Finalizando.")
         return False
@@ -36,11 +44,21 @@ def run_pipeline() -> bool:
 
     # 3. Generate content
     logger.info("=== Paso 3: Generación de contenido ===")
-    post = generate_post(article)
+    post = generate_post(
+        article,
+        topic_name=topic.name,
+        topic_writing_guidelines=topic.writing_guidelines,
+        template_name=topic.post_template,
+    )
     if post is None:
         logger.error("No se pudo generar contenido. Finalizando.")
-        state.mark_processed(article.url, title=article.title, score=score, status="gen_failed")
+        state.mark_processed(
+            article.url, title=article.title, score=score,
+            status="gen_failed", topic_id=topic.topic_id,
+        )
         return False
+    if topic.categories:
+        post.categories = topic.categories
 
     # 4. Generate cover image
     logger.info("=== Paso 4: Generación de imagen de portada ===")
@@ -54,7 +72,10 @@ def run_pipeline() -> bool:
         logger.info("Categorías: %s", post.categories)
         logger.info("Tags: %s", post.tags)
         logger.info("Imagen: %s", image_path)
-        state.mark_processed(article.url, title=post.title, score=score, status="dry_run")
+        state.mark_processed(
+            article.url, title=post.title, score=score,
+            status="dry_run", topic_id=topic.topic_id,
+        )
         return True
 
     logger.info("=== Paso 5: Publicación en WordPress (borrador) ===")
@@ -73,16 +94,38 @@ def run_pipeline() -> bool:
     post_id = create_draft(post, media_id=media_id)
     if post_id is None:
         logger.error("No se pudo crear el borrador en WordPress.")
-        state.mark_processed(article.url, title=post.title, score=score, status="wp_failed")
+        state.mark_processed(
+            article.url, title=post.title, score=score,
+            status="wp_failed", topic_id=topic.topic_id,
+        )
         return False
 
     # 6. Record success
     state.mark_processed(
         article.url, title=post.title, score=score,
-        wp_post_id=post_id, status="published_draft",
+        wp_post_id=post_id, status="published_draft", topic_id=topic.topic_id,
     )
     logger.info("=== Pipeline completado: borrador #%d creado ===", post_id)
     return True
+
+
+def run_pipeline() -> bool:
+    """Execute topic-driven pipeline. Returns True if any post was created."""
+    topics = load_topics(config.TOPICS_FILE, only_ids=config.TOPIC_IDS)
+    logger.info("Topics cargados: %s", [t.topic_id for t in topics])
+    created = 0
+
+    for topic in topics:
+        if created >= config.TOPICS_MAX_POSTS_PER_RUN:
+            logger.info(
+                "Límite de publicaciones por corrida alcanzado (%d)",
+                config.TOPICS_MAX_POSTS_PER_RUN,
+            )
+            break
+        if run_topic_pipeline(topic):
+            created += 1
+
+    return created > 0
 
 
 def main() -> None:

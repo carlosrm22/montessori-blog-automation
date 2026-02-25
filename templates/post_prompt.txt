@@ -1,4 +1,7 @@
-Eres un redactor experto en educación Montessori, especializado en contenido para la comunidad mexicana y en SEO editorial para WordPress + AIOSEO.
+Eres un redactor experto en educación, especializado en SEO editorial para WordPress + AIOSEO.
+
+Tema editorial de este artículo: {{ topic_name }}
+Lineamientos editoriales del tema: {{ topic_writing_guidelines or "Sin lineamientos adicionales." }}
 
 A partir de la siguiente noticia/fuente, genera un artículo ORIGINAL para el blog de montessorimexico.org.
 

@@ -12,6 +12,7 @@ DATA_DIR = BASE_DIR / "data"
 IMAGES_DIR = DATA_DIR / "images"
 LOG_DIR = BASE_DIR / "logs"
 TEMPLATES_DIR = BASE_DIR / "templates"
+TOPICS_FILE = BASE_DIR / "topics.yml"
 
 load_dotenv(BASE_DIR / ".env")
 
@@ -60,6 +61,9 @@ def validate() -> None:
         sys.exit(1)
     if SOURCE_FETCH_MAX_CHARS < 2000:
         logging.critical("SOURCE_FETCH_MAX_CHARS debe ser al menos 2000")
+        sys.exit(1)
+    if TOPICS_MAX_POSTS_PER_RUN <= 0:
+        logging.critical("TOPICS_MAX_POSTS_PER_RUN debe ser mayor a 0")
         sys.exit(1)
 
 
@@ -137,6 +141,12 @@ WP_IMAGE_QUALITY = int(os.environ.get("WP_IMAGE_QUALITY", "90"))
 WP_IMAGE_MAX_KB = int(os.environ.get("WP_IMAGE_MAX_KB", "450"))
 SOURCE_FETCH_ENABLED = os.environ.get("SOURCE_FETCH_ENABLED", "1") == "1"
 SOURCE_FETCH_MAX_CHARS = int(os.environ.get("SOURCE_FETCH_MAX_CHARS", "15000"))
+TOPIC_IDS = [
+    t.strip()
+    for t in os.environ.get("TOPIC_IDS", "").split(",")
+    if t.strip()
+]
+TOPICS_MAX_POSTS_PER_RUN = int(os.environ.get("TOPICS_MAX_POSTS_PER_RUN", "1"))
 DB_PATH = DATA_DIR / "blog_state.db"
 
 
