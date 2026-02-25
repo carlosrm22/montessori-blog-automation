@@ -10,6 +10,7 @@ from scorer import select_best
 from content import generate_post
 from image_gen import generate_cover_image
 from wordpress import upload_media, create_draft
+from source_fetch import enrich_article
 
 logger = logging.getLogger(__name__)
 
@@ -30,6 +31,8 @@ def run_pipeline() -> bool:
         logger.info("Ningún artículo alcanzó el umbral de calidad. Finalizando.")
         return False
     article, score = best
+    logger.info("=== Paso 2.5: Enriquecimiento de fuente ===")
+    article = enrich_article(article)
 
     # 3. Generate content
     logger.info("=== Paso 3: Generación de contenido ===")

@@ -35,6 +35,19 @@ Fragmento: {snippet}
 Responde SOLO con el JSON, sin markdown ni texto adicional."""
 
 WEIGHTS = {"relevancia": 0.35, "valor_educativo": 0.25, "actualidad": 0.40}
+SCORING_SCHEMA = {
+    "type": "object",
+    "required": [
+        "relevancia", "valor_educativo", "actualidad", "tipo_contenido", "justificacion",
+    ],
+    "properties": {
+        "relevancia": {"type": "number"},
+        "valor_educativo": {"type": "number"},
+        "actualidad": {"type": "number"},
+        "tipo_contenido": {"type": "string"},
+        "justificacion": {"type": "string"},
+    },
+}
 
 NEWS_HINTS = (
     "news", "noticia", "noticias", "announcement", "press", "release",
@@ -101,16 +114,22 @@ def score_article(article: SearchResult) -> float | None:
         response = client.models.generate_content(
             model=config.GEMINI_TEXT_MODEL,
             contents=prompt,
+            config=genai.types.GenerateContentConfig(
+                response_mime_type="application/json",
+                response_schema=SCORING_SCHEMA,
+            ),
         )
-        text = response.text.strip()
-        # Strip markdown code fences if present
-        if text.startswith("```"):
-            text = text.split("\n", 1)[1] if "\n" in text else text[3:]
-            if text.endswith("```"):
-                text = text[:-3]
-            text = text.strip()
-
-        data = json.loads(text)
+        text = (response.text or "").strip()
+        try:
+            data = json.loads(text)
+        except Exception:
+            # Defensive fallback in case model ignores strict output.
+            if text.startswith("```"):
+                text = text.split("\n", 1)[1] if "\n" in text else text[3:]
+                if text.endswith("```"):
+                    text = text[:-3]
+                text = text.strip()
+            data = json.loads(text)
         weighted = sum(
             data.get(key, 0.0) * weight for key, weight in WEIGHTS.items()
         )

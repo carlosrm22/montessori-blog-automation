@@ -23,6 +23,9 @@ class SearchResult:
     title: str
     url: str
     snippet: str
+    source_text: str = ""
+    source_published_at: str = ""
+    source_author: str = ""
 
 
 def _date_restrict() -> str:
@@ -40,6 +43,8 @@ def _search_brave(query: str, retries: int = 3) -> list[dict]:
         params["country"] = config.BRAVE_SEARCH_COUNTRY
     if config.BRAVE_SEARCH_LANG:
         params["search_lang"] = config.BRAVE_SEARCH_LANG
+    if config.BRAVE_SEARCH_FRESHNESS:
+        params["freshness"] = config.BRAVE_SEARCH_FRESHNESS
     headers = {
         "Accept": "application/json",
         "X-Subscription-Token": config.BRAVE_SEARCH_API_KEY,

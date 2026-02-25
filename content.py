@@ -13,6 +13,26 @@ import config
 from search import SearchResult
 
 logger = logging.getLogger(__name__)
+POST_SCHEMA = {
+    "type": "object",
+    "required": [
+        "title", "body", "excerpt", "categories", "tags",
+        "seo_title", "seo_description", "focus_keyphrase",
+        "image_prompt", "image_alt_text",
+    ],
+    "properties": {
+        "title": {"type": "string"},
+        "body": {"type": "string"},
+        "excerpt": {"type": "string"},
+        "categories": {"type": "array", "items": {"type": "string"}},
+        "tags": {"type": "array", "items": {"type": "string"}},
+        "seo_title": {"type": "string"},
+        "seo_description": {"type": "string"},
+        "focus_keyphrase": {"type": "string"},
+        "image_prompt": {"type": "string"},
+        "image_alt_text": {"type": "string"},
+    },
+}
 
 
 @dataclass
@@ -37,6 +57,9 @@ def _render_prompt(article: SearchResult) -> str:
         title=article.title,
         url=article.url,
         snippet=article.snippet,
+        source_text=article.source_text,
+        source_published_at=article.source_published_at,
+        source_author=article.source_author,
         blocked_terms=blocked_terms,
     )
 
@@ -209,15 +232,21 @@ def generate_post(article: SearchResult, max_retries: int = 2) -> GeneratedPost 
             response = client.models.generate_content(
                 model=config.GEMINI_TEXT_MODEL,
                 contents=prompt,
+                config=genai.types.GenerateContentConfig(
+                    response_mime_type="application/json",
+                    response_schema=POST_SCHEMA,
+                ),
             )
-            text = response.text.strip()
-            if text.startswith("```"):
-                text = text.split("\n", 1)[1] if "\n" in text else text[3:]
-                if text.endswith("```"):
-                    text = text[:-3]
-                text = text.strip()
-
-            data = json.loads(text)
+            text = (response.text or "").strip()
+            try:
+                data = json.loads(text)
+            except Exception:
+                if text.startswith("```"):
+                    text = text.split("\n", 1)[1] if "\n" in text else text[3:]
+                    if text.endswith("```"):
+                        text = text[:-3]
+                    text = text.strip()
+                data = json.loads(text)
             body = data.get("body", "")
             word_count = _count_words_html(body)
 

@@ -48,6 +48,7 @@ Variables principales:
 - `BRAVE_SEARCH_COUNT`: cantidad de resultados por query en Brave (default `20`).
 - `BRAVE_SEARCH_COUNTRY`: país para Brave (vacío = sin restricción geográfica).
 - `BRAVE_SEARCH_LANG`: idioma para Brave (vacío = cualquier idioma).
+- `BRAVE_SEARCH_FRESHNESS`: filtro temporal Brave (`pd`, `pw`, `pm`, `py`; default `pw`).
 - `EXCLUDED_DOMAINS`: dominios a excluir de resultados (default `montessorimexico.org`).
 - `BLOCKED_SOURCE_TERMS`: términos para descartar fuentes no deseadas (default incluye AMI/AMI México y variantes).
 - `BLOCKED_MENTION_TERMS`: términos prohibidos dentro del contenido generado (default incluye AMI/AMI México y variantes).
@@ -69,6 +70,8 @@ Variables principales:
 - `WP_IMAGE_WIDTH` / `WP_IMAGE_HEIGHT`: dimensiones objetivo de portada.
 - `WP_IMAGE_QUALITY`: calidad JPEG inicial (1-100).
 - `WP_IMAGE_MAX_KB`: peso objetivo máximo de imagen.
+- `SOURCE_FETCH_ENABLED`: habilita extracción del texto real de la fuente antes de redactar.
+- `SOURCE_FETCH_MAX_CHARS`: máximo de caracteres extraídos desde la nota origen.
 
 ## Ejecución
 
@@ -111,6 +114,7 @@ Ejemplo para correr cada día a las 08:00:
 ├── search.py        # Búsqueda de noticias (Brave / Google CSE)
 ├── scorer.py        # Scoring de relevancia con Gemini
 ├── content.py       # Generación de artículo en HTML
+├── source_fetch.py  # Fetch + extracción de contenido de la fuente
 ├── image_gen.py     # Generación de portada con Gemini
 ├── wordpress.py     # Publicación de borradores vía WP REST API
 ├── state.py         # Persistencia SQLite de URLs procesadas

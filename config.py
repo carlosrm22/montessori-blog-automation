@@ -58,6 +58,9 @@ def validate() -> None:
     if MIN_BODY_WORDS < 300:
         logging.critical("MIN_BODY_WORDS debe ser al menos 300")
         sys.exit(1)
+    if SOURCE_FETCH_MAX_CHARS < 2000:
+        logging.critical("SOURCE_FETCH_MAX_CHARS debe ser al menos 2000")
+        sys.exit(1)
 
 
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")
@@ -66,6 +69,7 @@ BRAVE_SEARCH_API_KEY = os.environ.get("BRAVE_SEARCH_API_KEY", "")
 BRAVE_SEARCH_COUNT = int(os.environ.get("BRAVE_SEARCH_COUNT", "20"))
 BRAVE_SEARCH_COUNTRY = os.environ.get("BRAVE_SEARCH_COUNTRY", "").strip()
 BRAVE_SEARCH_LANG = os.environ.get("BRAVE_SEARCH_LANG", "").strip()
+BRAVE_SEARCH_FRESHNESS = os.environ.get("BRAVE_SEARCH_FRESHNESS", "pw").strip()
 GOOGLE_CSE_KEY = os.environ.get("GOOGLE_CSE_KEY", "")
 GOOGLE_CSE_CX = os.environ.get("GOOGLE_CSE_CX", "")
 WP_SITE_URL = os.environ.get("WP_SITE_URL", "").rstrip("/")
@@ -131,6 +135,8 @@ WP_IMAGE_WIDTH = int(os.environ.get("WP_IMAGE_WIDTH", "1200"))
 WP_IMAGE_HEIGHT = int(os.environ.get("WP_IMAGE_HEIGHT", "630"))
 WP_IMAGE_QUALITY = int(os.environ.get("WP_IMAGE_QUALITY", "90"))
 WP_IMAGE_MAX_KB = int(os.environ.get("WP_IMAGE_MAX_KB", "450"))
+SOURCE_FETCH_ENABLED = os.environ.get("SOURCE_FETCH_ENABLED", "1") == "1"
+SOURCE_FETCH_MAX_CHARS = int(os.environ.get("SOURCE_FETCH_MAX_CHARS", "15000"))
 DB_PATH = DATA_DIR / "blog_state.db"
 
 
