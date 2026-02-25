@@ -2,6 +2,7 @@
 
 import sqlite3
 import logging
+import json
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -22,11 +23,24 @@ CREATE TABLE IF NOT EXISTS processed_articles (
 )
 """
 
+_CREATE_SEO_REPORTS_TABLE = """
+CREATE TABLE IF NOT EXISTS seo_reports (
+    topic_id TEXT NOT NULL,
+    url TEXT NOT NULL,
+    truseo_score INTEGER NOT NULL,
+    headline_score INTEGER NOT NULL,
+    payload_json TEXT NOT NULL,
+    created_at TEXT DEFAULT (datetime('now')),
+    PRIMARY KEY (topic_id, url)
+)
+"""
+
 
 def _connect() -> sqlite3.Connection:
     config.DATA_DIR.mkdir(parents=True, exist_ok=True)
     conn = sqlite3.connect(config.DB_PATH)
     conn.execute(_CREATE_TABLE)
+    conn.execute(_CREATE_SEO_REPORTS_TABLE)
     conn.commit()
     return conn
 
@@ -138,6 +152,48 @@ def get_last_published_at(
     if not row:
         return None
     return _parse_created_at(str(row[0]))
+
+
+def save_seo_report(
+    *,
+    topic_id: str,
+    url: str,
+    truseo_score: int,
+    headline_score: int,
+    payload: dict,
+) -> None:
+    serialized = json.dumps(payload, ensure_ascii=False)
+    with _connect() as conn:
+        _migrate_if_needed(conn)
+        conn.execute(
+            """INSERT OR REPLACE INTO seo_reports
+               (topic_id, url, truseo_score, headline_score, payload_json, created_at)
+               VALUES (?, ?, ?, ?, ?, ?)""",
+            (
+                topic_id,
+                url,
+                truseo_score,
+                headline_score,
+                serialized,
+                datetime.now(timezone.utc).isoformat(),
+            ),
+        )
+        conn.commit()
+
+
+def get_seo_report(topic_id: str, url: str) -> dict | None:
+    with _connect() as conn:
+        _migrate_if_needed(conn)
+        row = conn.execute(
+            "SELECT payload_json FROM seo_reports WHERE topic_id = ? AND url = ?",
+            (topic_id, url),
+        ).fetchone()
+    if not row:
+        return None
+    try:
+        return json.loads(str(row[0]))
+    except json.JSONDecodeError:
+        return None
 
 
 if __name__ == "__main__":

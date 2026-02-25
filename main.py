@@ -13,6 +13,7 @@ from image_gen import generate_cover_image
 from wordpress import upload_media, create_draft
 from source_fetch import enrich_article
 from topics import TopicProfile, load_topics
+from seo_rules import analyze_headline, analyze_truseo, build_slug
 
 logger = logging.getLogger(__name__)
 
@@ -87,6 +88,66 @@ def run_topic_pipeline(topic: TopicProfile) -> bool:
     if topic.categories:
         post.categories = topic.categories
 
+    # 3.5 Local SEO gate (TruSEO-like + Headline) without AIOSEO API.
+    truseo_score = None
+    headline_score = None
+    if config.LOCAL_SEO_RULES_ENABLED:
+        truseo_report = analyze_truseo(
+            html=post.body,
+            seo_title=post.seo_title,
+            meta_description=post.seo_description,
+            slug=build_slug(post.seo_title or post.title),
+            focus_keyphrase=post.focus_keyphrase,
+            site_domain=config.WP_SITE_DOMAIN,
+            strict_phrase=config.SEO_STRICT_PHRASE,
+        )
+        headline_report = analyze_headline(post.title, primary_keyword=post.focus_keyphrase)
+        truseo_score = truseo_report["overall"].score
+        headline_score = headline_report.score
+
+        report_payload = {
+            "truseo": {k: v.to_dict() for k, v in truseo_report.items()},
+            "headline": headline_report.to_dict(),
+            "thresholds": {
+                "truseo_min_score": config.TRUSEO_MIN_SCORE,
+                "headline_min_score": config.HEADLINE_MIN_SCORE,
+            },
+        }
+        state.save_seo_report(
+            topic_id=topic.topic_id,
+            url=article.url,
+            truseo_score=truseo_score,
+            headline_score=headline_score,
+            payload=report_payload,
+        )
+
+        logger.info(
+            "SEO local [%s]: TruSEO-like=%d, Headline=%d",
+            topic.topic_id,
+            truseo_score,
+            headline_score,
+        )
+        if truseo_score < config.TRUSEO_MIN_SCORE or headline_score < config.HEADLINE_MIN_SCORE:
+            logger.warning(
+                (
+                    "SEO gate no pasó para '%s' (TruSEO-like=%d/%d, Headline=%d/%d). "
+                    "Se deja fuera de publicación automática."
+                ),
+                post.title,
+                truseo_score,
+                config.TRUSEO_MIN_SCORE,
+                headline_score,
+                config.HEADLINE_MIN_SCORE,
+            )
+            state.mark_processed(
+                article.url,
+                title=post.title,
+                score=score,
+                status="seo_failed",
+                topic_id=topic.topic_id,
+            )
+            return False
+
     # 4. Generate cover image
     logger.info("=== Paso 4: Generación de imagen de portada ===")
     image_path = generate_cover_image(post.image_prompt)
@@ -98,6 +159,8 @@ def run_topic_pipeline(topic: TopicProfile) -> bool:
         logger.info("Excerpt: %s", post.excerpt)
         logger.info("Categorías: %s", post.categories)
         logger.info("Tags: %s", post.tags)
+        if truseo_score is not None and headline_score is not None:
+            logger.info("SEO local: TruSEO-like=%d | Headline=%d", truseo_score, headline_score)
         logger.info("Imagen: %s", image_path)
         state.mark_processed(
             article.url, title=post.title, score=score,

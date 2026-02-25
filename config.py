@@ -4,6 +4,7 @@ import logging
 import os
 import sys
 from pathlib import Path
+from urllib.parse import urlparse
 
 from dotenv import load_dotenv
 
@@ -67,6 +68,12 @@ def validate() -> None:
         sys.exit(1)
     if PUBLISH_INTERVAL_DAYS < 0:
         logging.critical("PUBLISH_INTERVAL_DAYS no puede ser negativo")
+        sys.exit(1)
+    if TRUSEO_MIN_SCORE < 0 or TRUSEO_MIN_SCORE > 100:
+        logging.critical("TRUSEO_MIN_SCORE debe estar entre 0 y 100")
+        sys.exit(1)
+    if HEADLINE_MIN_SCORE < 0 or HEADLINE_MIN_SCORE > 100:
+        logging.critical("HEADLINE_MIN_SCORE debe estar entre 0 y 100")
         sys.exit(1)
 
 
@@ -133,7 +140,11 @@ MIN_BODY_WORDS = int(os.environ.get("MIN_BODY_WORDS", "600"))
 DRY_RUN = os.environ.get("DRY_RUN", "0") == "1"
 GEMINI_TEXT_MODEL = os.environ.get("GEMINI_TEXT_MODEL", "gemini-2.5-flash")
 GEMINI_IMAGE_MODEL = os.environ.get("GEMINI_IMAGE_MODEL", "gemini-2.5-flash-image")
-AIOSEO_SYNC = os.environ.get("AIOSEO_SYNC", "1") == "1"
+AIOSEO_SYNC = os.environ.get("AIOSEO_SYNC", "0") == "1"
+LOCAL_SEO_RULES_ENABLED = os.environ.get("LOCAL_SEO_RULES_ENABLED", "1") == "1"
+TRUSEO_MIN_SCORE = int(os.environ.get("TRUSEO_MIN_SCORE", "70"))
+HEADLINE_MIN_SCORE = int(os.environ.get("HEADLINE_MIN_SCORE", "65"))
+SEO_STRICT_PHRASE = os.environ.get("SEO_STRICT_PHRASE", "1") == "1"
 SEO_TITLE_MAX_LEN = int(os.environ.get("SEO_TITLE_MAX_LEN", "60"))
 SEO_DESCRIPTION_MAX_LEN = int(os.environ.get("SEO_DESCRIPTION_MAX_LEN", "155"))
 EXCERPT_MAX_LEN = int(os.environ.get("EXCERPT_MAX_LEN", "160"))
@@ -152,6 +163,7 @@ TOPIC_IDS = [
 TOPICS_MAX_POSTS_PER_RUN = int(os.environ.get("TOPICS_MAX_POSTS_PER_RUN", "1"))
 PUBLISH_INTERVAL_DAYS = int(os.environ.get("PUBLISH_INTERVAL_DAYS", "15"))
 DB_PATH = DATA_DIR / "blog_state.db"
+WP_SITE_DOMAIN = (urlparse(WP_SITE_URL).netloc or "").lower()
 
 
 def setup_logging() -> None:

@@ -9,9 +9,10 @@ El flujo completo hace lo siguiente:
 3. Evalúa relevancia con Gemini + heurísticas anti-evergreen.
 4. Extrae texto real de la fuente para base factual.
 5. Genera un artículo original en HTML.
-6. Genera imagen de portada optimizada para WordPress.
-7. Publica borrador en WordPress y sincroniza metadata SEO para AIOSEO.
-8. Guarda estado en SQLite por tema para no reprocesar URLs.
+6. Evalúa SEO local (TruSEO-like + Headline score) con reglas checklist sin usar API de AIOSEO.
+7. Genera imagen de portada optimizada para WordPress.
+8. Publica borrador en WordPress (AIOSEO API opcional y desactivada por defecto).
+9. Guarda estado en SQLite por tema para no reprocesar URLs y reportes SEO por URL.
 
 ## Requisitos
 
@@ -67,7 +68,11 @@ Variables principales:
 - `DRY_RUN`: `1` para simular sin publicar; `0` para publicar borradores.
 - `GEMINI_TEXT_MODEL`: modelo para scoring y generación de texto (default `gemini-2.5-flash`).
 - `GEMINI_IMAGE_MODEL`: modelo para portada (default `gemini-2.5-flash-image`).
-- `AIOSEO_SYNC`: `1` para sincronizar title/description/OG/Twitter en AIOSEO.
+- `AIOSEO_SYNC`: `1` para sincronizar title/description/OG/Twitter en AIOSEO (opcional, default `0`).
+- `LOCAL_SEO_RULES_ENABLED`: habilita evaluación SEO local (`1` por defecto).
+- `TRUSEO_MIN_SCORE`: mínimo TruSEO-like para publicar automáticamente (default `70`).
+- `HEADLINE_MIN_SCORE`: mínimo Headline score para publicar automáticamente (default `65`).
+- `SEO_STRICT_PHRASE`: `1` para coincidencia estricta de focus keyphrase; `0` modo más permisivo.
 - `SEO_TITLE_MAX_LEN`: máximo de caracteres para SEO title (default `60`).
 - `SEO_DESCRIPTION_MAX_LEN`: máximo de caracteres para meta description (default `155`).
 - `EXCERPT_MAX_LEN`: máximo de caracteres para excerpt (default `160`).
@@ -135,6 +140,7 @@ Ejemplo para correr todos los días a las 08:00:
 ├── search.py        # Búsqueda de noticias (Brave / Google CSE)
 ├── topics.py        # Carga y validación de perfiles temáticos
 ├── scorer.py        # Scoring de relevancia con Gemini
+├── seo_rules.py     # TruSEO-like + Headline scoring local
 ├── content.py       # Generación de artículo en HTML
 ├── source_fetch.py  # Fetch + extracción de contenido de la fuente
 ├── image_gen.py     # Generación de portada con Gemini
@@ -153,6 +159,7 @@ Ejemplo para correr todos los días a las 08:00:
 ## Salidas y estado
 
 - Base de estado: `data/blog_state.db`
+- Reportes SEO locales: tabla `seo_reports` en `data/blog_state.db`
 - Imágenes: `data/images/`
 - Logs rotativos: `logs/automation.log`
 
@@ -166,6 +173,7 @@ Ejemplo para correr todos los días a las 08:00:
 - `BLOCKED_MENTION_TERMS` evita que el texto final mencione AMI/AMI México.
 - Se actualizan `alt_text`, `caption` y `description` de la imagen destacada para accesibilidad.
 - El scoring penaliza páginas evergreen (home/about/wiki) y prioriza contenido más noticioso/reciente.
+- El SEO gate local calcula `TruSEO-like` y `Headline score`; si no pasan umbral se marca `seo_failed` y no publica.
 
 ## Licencia
 
