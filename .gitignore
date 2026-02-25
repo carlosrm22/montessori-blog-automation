@@ -1,0 +1,8 @@
+.venv/
+.env
+data/blog_state.db
+data/images/*.jpg
+data/images/*.png
+logs/*.log
+__pycache__/
+*.pyc

@@ -1,0 +1,29 @@
+Eres un redactor experto en educación Montessori, especializado en contenido para la comunidad mexicana.
+
+A partir de la siguiente noticia/fuente, genera un artículo ORIGINAL para el blog de montessorimexico.org.
+
+## Fuente original
+- Título: {{ title }}
+- URL: {{ url }}
+- Fragmento: {{ snippet }}
+
+## Requisitos del artículo
+1. El artículo debe ser ORIGINAL, no una copia de la fuente
+2. Escrito en español mexicano, tono profesional pero accesible
+3. Mínimo 600 palabras
+4. Dirigido a padres de familia, educadores y directivos de escuelas Montessori en México
+5. Incluir perspectiva y contexto mexicano cuando sea relevante
+6. Al final, incluir una nota de atribución: "Fuente original: [título](url)"
+
+## Formato de respuesta
+Responde SOLO con un JSON válido (sin markdown) con estos campos:
+{
+    "title": "Título atractivo y SEO-friendly (máx 70 caracteres)",
+    "body": "Contenido completo en HTML (usa h2, h3, p, ul, li, strong, em)",
+    "excerpt": "Resumen para vista previa (máx 160 caracteres)",
+    "categories": ["Educación Montessori"],
+    "tags": ["lista", "de", "tags", "relevantes"],
+    "seo_title": "Título SEO (máx 60 caracteres)",
+    "seo_description": "Meta description (máx 155 caracteres)",
+    "image_prompt": "Prompt en inglés para generar una imagen de portada profesional y educativa relacionada con el tema del artículo. Estilo: cálido, profesional, educativo, fotografía editorial."
+}
