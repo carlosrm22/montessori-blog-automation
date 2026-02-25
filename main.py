@@ -44,6 +44,27 @@ def _is_publish_due() -> bool:
     return True
 
 
+def _rotate_topics(topics: list[TopicProfile]) -> list[TopicProfile]:
+    if len(topics) <= 1:
+        return topics
+
+    last_topic_id = state.get_last_published_topic_id(statuses=("published_draft",))
+    if not last_topic_id:
+        return topics
+
+    idx = next((i for i, topic in enumerate(topics) if topic.topic_id == last_topic_id), -1)
+    if idx == -1:
+        return topics
+
+    rotated = topics[idx + 1:] + topics[: idx + 1]
+    logger.info(
+        "Rotación de topics activa. Último publicado: %s | Orden actual: %s",
+        last_topic_id,
+        [t.topic_id for t in rotated],
+    )
+    return rotated
+
+
 def run_topic_pipeline(topic: TopicProfile) -> bool:
     """Execute full pipeline for one topic. Returns True if a post was created."""
     logger.info("=== Topic: %s (%s) ===", topic.name, topic.topic_id)
@@ -206,6 +227,7 @@ def run_pipeline() -> bool:
         return False
 
     topics = load_topics(config.TOPICS_FILE, only_ids=config.TOPIC_IDS)
+    topics = _rotate_topics(topics)
     logger.info("Topics cargados: %s", [t.topic_id for t in topics])
     created = 0
 

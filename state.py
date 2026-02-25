@@ -154,6 +154,25 @@ def get_last_published_at(
     return _parse_created_at(str(row[0]))
 
 
+def get_last_published_topic_id(
+    statuses: tuple[str, ...] = ("published_draft",),
+) -> str | None:
+    if not statuses:
+        return None
+    placeholders = ",".join("?" for _ in statuses)
+    sql = (
+        "SELECT topic_id FROM processed_articles "
+        f"WHERE status IN ({placeholders}) "
+        "ORDER BY created_at DESC LIMIT 1"
+    )
+    with _connect() as conn:
+        _migrate_if_needed(conn)
+        row = conn.execute(sql, list(statuses)).fetchone()
+    if not row:
+        return None
+    return str(row[0] or "").strip() or None
+
+
 def save_seo_report(
     *,
     topic_id: str,

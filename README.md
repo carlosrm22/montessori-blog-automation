@@ -62,7 +62,7 @@ Variables principales:
 - `SEARCH_QUERIES`: fallback de consultas separadas por coma (solo si falta `topics.yml`).
 - `TOPIC_IDS`: lista separada por coma para correr solo ciertos temas (ej. `montessori_core,constructivismo`).
 - `TOPICS_MAX_POSTS_PER_RUN`: máximo de borradores por corrida.
-- `PUBLISH_INTERVAL_DAYS`: días mínimos entre publicaciones globales (default `15`, `0` = desactivar).
+- `PUBLISH_INTERVAL_DAYS`: días mínimos entre publicaciones globales (default `7`, `0` = desactivar).
 - `MIN_USABILITY_SCORE`: umbral mínimo para publicar.
 - `MIN_BODY_WORDS`: mínimo de palabras requeridas para el body (default `600`).
 - `DRY_RUN`: `1` para simular sin publicar; `0` para publicar borradores.
@@ -111,6 +111,14 @@ source .venv/bin/activate
 python main.py
 ```
 
+Ver reportes SEO locales guardados:
+
+```bash
+python report_seo.py --limit 20
+python report_seo.py --only-failed
+python report_seo.py --topic-id educacion_humanista
+```
+
 ## Modo seguro (recomendado al inicio)
 
 Ejecuta primero en simulación para validar prompts y scoring:
@@ -124,7 +132,7 @@ En este modo no publica en WordPress, pero sí ejecuta búsqueda, evaluación, g
 ## Programación automática (cron)
 
 Recomendación: correr diario y dejar que el candado de cadencia (`PUBLISH_INTERVAL_DAYS`) decida si toca publicar.
-Con `PUBLISH_INTERVAL_DAYS=15`, publicará aproximadamente cada 15 días sin intervención humana.
+Con `PUBLISH_INTERVAL_DAYS=7`, publicará aproximadamente cada semana sin intervención humana.
 
 Ejemplo para correr todos los días a las 08:00:
 
@@ -174,6 +182,7 @@ Ejemplo para correr todos los días a las 08:00:
 - Se actualizan `alt_text`, `caption` y `description` de la imagen destacada para accesibilidad.
 - El scoring penaliza páginas evergreen (home/about/wiki) y prioriza contenido más noticioso/reciente.
 - El SEO gate local calcula `TruSEO-like` y `Headline score`; si no pasan umbral se marca `seo_failed` y no publica.
+- El orden de publicación rota automáticamente por `topic_id` tomando como referencia el último borrador publicado.
 
 ## Licencia
 

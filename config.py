@@ -161,7 +161,7 @@ TOPIC_IDS = [
     if t.strip()
 ]
 TOPICS_MAX_POSTS_PER_RUN = int(os.environ.get("TOPICS_MAX_POSTS_PER_RUN", "1"))
-PUBLISH_INTERVAL_DAYS = int(os.environ.get("PUBLISH_INTERVAL_DAYS", "15"))
+PUBLISH_INTERVAL_DAYS = int(os.environ.get("PUBLISH_INTERVAL_DAYS", "7"))
 DB_PATH = DATA_DIR / "blog_state.db"
 WP_SITE_DOMAIN = (urlparse(WP_SITE_URL).netloc or "").lower()
 
