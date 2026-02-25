@@ -75,6 +75,18 @@ def validate() -> None:
     if HEADLINE_MIN_SCORE < 0 or HEADLINE_MIN_SCORE > 100:
         logging.critical("HEADLINE_MIN_SCORE debe estar entre 0 y 100")
         sys.exit(1)
+    if POST_TITLE_MAX_LEN < 40 or POST_TITLE_MAX_LEN > 120:
+        logging.critical("POST_TITLE_MAX_LEN debe estar entre 40 y 120")
+        sys.exit(1)
+    if SOCIAL_TITLE_MAX_LEN < 40 or SOCIAL_TITLE_MAX_LEN > 120:
+        logging.critical("SOCIAL_TITLE_MAX_LEN debe estar entre 40 y 120")
+        sys.exit(1)
+    if SOCIAL_DESCRIPTION_MAX_LEN < 120 or SOCIAL_DESCRIPTION_MAX_LEN > 200:
+        logging.critical("SOCIAL_DESCRIPTION_MAX_LEN debe estar entre 120 y 200")
+        sys.exit(1)
+    if FOCUS_KEYPHRASE_MAX_WORDS < 2 or FOCUS_KEYPHRASE_MAX_WORDS > 8:
+        logging.critical("FOCUS_KEYPHRASE_MAX_WORDS debe estar entre 2 y 8")
+        sys.exit(1)
 
 
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")
@@ -149,8 +161,12 @@ NOTIFICATIONS_ENABLED = os.environ.get("NOTIFICATIONS_ENABLED", "1") == "1"
 NOTIFY_WEBHOOK_URL = os.environ.get("NOTIFY_WEBHOOK_URL", "").strip()
 TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN", "").strip()
 TELEGRAM_CHAT_ID = os.environ.get("TELEGRAM_CHAT_ID", "").strip()
+POST_TITLE_MAX_LEN = int(os.environ.get("POST_TITLE_MAX_LEN", "60"))
 SEO_TITLE_MAX_LEN = int(os.environ.get("SEO_TITLE_MAX_LEN", "60"))
 SEO_DESCRIPTION_MAX_LEN = int(os.environ.get("SEO_DESCRIPTION_MAX_LEN", "155"))
+SOCIAL_TITLE_MAX_LEN = int(os.environ.get("SOCIAL_TITLE_MAX_LEN", "60"))
+SOCIAL_DESCRIPTION_MAX_LEN = int(os.environ.get("SOCIAL_DESCRIPTION_MAX_LEN", "155"))
+FOCUS_KEYPHRASE_MAX_WORDS = int(os.environ.get("FOCUS_KEYPHRASE_MAX_WORDS", "5"))
 EXCERPT_MAX_LEN = int(os.environ.get("EXCERPT_MAX_LEN", "160"))
 MAX_TAGS = int(os.environ.get("MAX_TAGS", "10"))
 WP_IMAGE_WIDTH = int(os.environ.get("WP_IMAGE_WIDTH", "1200"))
@@ -168,6 +184,14 @@ TOPICS_MAX_POSTS_PER_RUN = int(os.environ.get("TOPICS_MAX_POSTS_PER_RUN", "1"))
 PUBLISH_INTERVAL_DAYS = int(os.environ.get("PUBLISH_INTERVAL_DAYS", "7"))
 DB_PATH = DATA_DIR / "blog_state.db"
 WP_SITE_DOMAIN = (urlparse(WP_SITE_URL).netloc or "").lower()
+INTERNAL_LINKS = [
+    u.strip()
+    for u in os.environ.get(
+        "INTERNAL_LINKS",
+        f"{WP_SITE_URL}/,{WP_SITE_URL}/blog/",
+    ).split(",")
+    if u.strip()
+]
 
 
 def setup_logging() -> None:

@@ -261,10 +261,10 @@ def _sync_aioseo(post_id: int, post: GeneratedPost) -> None:
         "id": post_id,
         "title": post.seo_title,
         "description": post.seo_description,
-        "og_title": post.seo_title,
-        "og_description": post.seo_description,
-        "twitter_title": post.seo_title,
-        "twitter_description": post.seo_description,
+        "og_title": post.og_title or post.seo_title,
+        "og_description": post.og_description or post.seo_description,
+        "twitter_title": post.twitter_title or post.seo_title,
+        "twitter_description": post.twitter_description or post.seo_description,
         "keywords": ", ".join(keywords),
     }
     resp = _aioseo_request("post", "post", json=payload)

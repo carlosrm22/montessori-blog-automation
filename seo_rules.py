@@ -162,16 +162,24 @@ def _keyword_in_img_alt(html: str, phrase: str, strict_phrase: bool = True) -> b
 def analyze_truseo(
     *,
     html: str,
+    post_title: str,
     seo_title: str,
     meta_description: str,
     slug: str,
     focus_keyphrase: str,
     site_domain: str,
+    og_title: str = "",
+    og_description: str = "",
+    twitter_title: str = "",
+    twitter_description: str = "",
+    social_image_source: str = "",
+    post_title_max_len: int = 60,
     strict_phrase: bool = True,
 ) -> dict[str, ScoreReport]:
     text = _extract_text_from_html(html)
     word_count = _word_count(text)
     internal_links, external_links = _count_internal_external_links(html, site_domain)
+    post_title_len = len((post_title or "").strip())
     seo_title_len = len((seo_title or "").strip())
     meta_desc_len = len((meta_description or "").strip())
     paragraphs_too_long = _paragraphs_over_120_words(html)
@@ -180,10 +188,18 @@ def analyze_truseo(
     sentences = _split_sentences(text)
     avg_sentence_words = (
         sum(_word_count(sentence) for sentence in sentences) / len(sentences)
-        if sentences else 0.0
+        if sentences
+        else 0.0
     )
 
     page_checks = [
+        CheckResult(
+            key="post_title_length",
+            passed=post_title_len <= post_title_max_len,
+            details="Título del post dentro de longitud recomendada.",
+            value=post_title_len,
+            target=f"<= {post_title_max_len}",
+        ),
         CheckResult(
             key="meta_description_length",
             passed=120 <= meta_desc_len <= 160,
@@ -249,6 +265,39 @@ def analyze_truseo(
             target="<=20",
         ),
     ]
+
+    social_image_ok = (social_image_source or "").strip().lower() in {"featured_media", "custom_url"}
+    page_checks.extend(
+        [
+            CheckResult(
+                key="og_title_present",
+                passed=bool((og_title or "").strip()) and len((og_title or "").strip()) <= 60,
+                details="Open Graph title presente y <= 60 caracteres.",
+            ),
+            CheckResult(
+                key="og_description_present",
+                passed=bool((og_description or "").strip()) and len((og_description or "").strip()) <= 155,
+                details="Open Graph description presente y <= 155 caracteres.",
+            ),
+            CheckResult(
+                key="twitter_title_present",
+                passed=bool((twitter_title or "").strip()) and len((twitter_title or "").strip()) <= 60,
+                details="Twitter title presente y <= 60 caracteres.",
+            ),
+            CheckResult(
+                key="twitter_description_present",
+                passed=bool((twitter_description or "").strip()) and len((twitter_description or "").strip()) <= 155,
+                details="Twitter description presente y <= 155 caracteres.",
+            ),
+            CheckResult(
+                key="social_image_source",
+                passed=social_image_ok,
+                details="Origen de imagen social definido (featured_media/custom_url).",
+                value=social_image_source,
+                target="featured_media|custom_url",
+            ),
+        ]
+    )
     page_score = _score_from_checks(page_checks)
 
     keyword = (focus_keyphrase or "").strip()
@@ -300,10 +349,10 @@ def analyze_truseo(
         ),
         CheckResult(
             key="keyword_length",
-            passed=len(keyword.split()) <= 4,
-            details="Focus keyword con 4 palabras o menos.",
+            passed=len(keyword.split()) <= 5,
+            details="Focus keyword con 5 palabras o menos.",
             value=len(keyword.split()),
-            target="<=4",
+            target="<=5",
         ),
         CheckResult(
             key="keyword_density",
@@ -314,6 +363,16 @@ def analyze_truseo(
                 "density_percent": round(density, 3),
             },
             target=">0",
+        ),
+        CheckResult(
+            key="keyword_in_og_description",
+            passed=_keyword_occurrences(og_description, keyword, strict_phrase) > 0,
+            details="Focus keyword en Open Graph description.",
+        ),
+        CheckResult(
+            key="keyword_in_twitter_description",
+            passed=_keyword_occurrences(twitter_description, keyword, strict_phrase) > 0,
+            details="Focus keyword en Twitter description.",
         ),
     ]
     keyword_score = _score_from_checks(keyword_checks)

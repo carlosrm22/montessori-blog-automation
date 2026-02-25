@@ -116,11 +116,18 @@ def run_topic_pipeline(topic: TopicProfile) -> bool:
     if config.LOCAL_SEO_RULES_ENABLED:
         truseo_report = analyze_truseo(
             html=post.body,
+            post_title=post.title,
             seo_title=post.seo_title,
             meta_description=post.seo_description,
             slug=build_slug(post.seo_title or post.title),
             focus_keyphrase=post.focus_keyphrase,
             site_domain=config.WP_SITE_DOMAIN,
+            og_title=post.og_title,
+            og_description=post.og_description,
+            twitter_title=post.twitter_title,
+            twitter_description=post.twitter_description,
+            social_image_source=post.social_image_source,
+            post_title_max_len=config.POST_TITLE_MAX_LEN,
             strict_phrase=config.SEO_STRICT_PHRASE,
         )
         headline_report = analyze_headline(post.title, primary_keyword=post.focus_keyphrase)

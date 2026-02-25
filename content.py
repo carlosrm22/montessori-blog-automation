@@ -1,10 +1,13 @@
 """Genera artículo original optimizado para SEO usando Gemini."""
 
+from __future__ import annotations
+
 import json
 import logging
 import re
 import unicodedata
 from dataclasses import dataclass
+from urllib.parse import urlparse
 
 from google import genai
 from jinja2 import Environment, FileSystemLoader
@@ -16,9 +19,16 @@ logger = logging.getLogger(__name__)
 POST_SCHEMA = {
     "type": "object",
     "required": [
-        "title", "body", "excerpt", "categories", "tags",
-        "seo_title", "seo_description", "focus_keyphrase",
-        "image_prompt", "image_alt_text",
+        "title",
+        "body",
+        "excerpt",
+        "categories",
+        "tags",
+        "seo_title",
+        "seo_description",
+        "focus_keyphrase",
+        "image_prompt",
+        "image_alt_text",
     ],
     "properties": {
         "title": {"type": "string"},
@@ -29,6 +39,11 @@ POST_SCHEMA = {
         "seo_title": {"type": "string"},
         "seo_description": {"type": "string"},
         "focus_keyphrase": {"type": "string"},
+        "og_title": {"type": "string"},
+        "og_description": {"type": "string"},
+        "twitter_title": {"type": "string"},
+        "twitter_description": {"type": "string"},
+        "social_image_source": {"type": "string"},
         "image_prompt": {"type": "string"},
         "image_alt_text": {"type": "string"},
     },
@@ -45,8 +60,30 @@ class GeneratedPost:
     seo_title: str
     seo_description: str
     focus_keyphrase: str
+    og_title: str
+    og_description: str
+    twitter_title: str
+    twitter_description: str
+    social_image_source: str
     image_prompt: str
     image_alt_text: str
+
+
+def _is_public_source_url(url: str) -> bool:
+    try:
+        parsed = urlparse((url or "").strip())
+    except Exception:
+        return False
+    host = (parsed.netloc or "").lower()
+    if parsed.scheme not in ("http", "https"):
+        return False
+    if not host:
+        return False
+    if host in {"localhost", "127.0.0.1", "0.0.0.0", "::1"}:
+        return False
+    if host.endswith(".local"):
+        return False
+    return True
 
 
 def _render_prompt(
@@ -58,11 +95,13 @@ def _render_prompt(
     env = Environment(loader=FileSystemLoader(config.TEMPLATES_DIR))
     template = env.get_template(template_name)
     blocked_terms = ", ".join(config.BLOCKED_MENTION_TERMS)
+    source_public_url = _is_public_source_url(article.url)
     return template.render(
         topic_name=topic_name,
         topic_writing_guidelines=topic_writing_guidelines,
         title=article.title,
         url=article.url,
+        source_public_url=source_public_url,
         snippet=article.snippet,
         source_text=article.source_text,
         source_published_at=article.source_published_at,
@@ -74,12 +113,14 @@ def _render_prompt(
 def _count_words_html(html: str) -> int:
     """Rough word count stripping HTML tags."""
     from bs4 import BeautifulSoup
+
     text = BeautifulSoup(html, "html.parser").get_text(separator=" ")
     return len(text.split())
 
 
 def _html_to_text(html: str) -> str:
     from bs4 import BeautifulSoup
+
     return BeautifulSoup(html, "html.parser").get_text(separator=" ")
 
 
@@ -120,16 +161,25 @@ def _normalize_for_compare(text: str) -> str:
     return " ".join(text.split())
 
 
-def _contains_keyphrase(title: str, keyphrase: str) -> bool:
-    title_n = _normalize_for_compare(title)
+def _contains_keyphrase(text: str, keyphrase: str) -> bool:
+    text_n = _normalize_for_compare(text)
     phrase_n = _normalize_for_compare(keyphrase)
     if not phrase_n:
         return True
-    if phrase_n in title_n:
+    if phrase_n in text_n:
         return True
     phrase_tokens = set(phrase_n.split())
-    title_tokens = set(title_n.split())
-    return bool(phrase_tokens) and phrase_tokens.issubset(title_tokens)
+    text_tokens = set(text_n.split())
+    return bool(phrase_tokens) and phrase_tokens.issubset(text_tokens)
+
+
+def _ensure_keyphrase(text: str, keyphrase: str, max_len: int) -> str:
+    text = _truncate(text, max_len, add_ellipsis=True)
+    if not keyphrase:
+        return text
+    if _contains_keyphrase(text, keyphrase):
+        return text
+    return _truncate(f"{keyphrase}: {text}", max_len, add_ellipsis=True)
 
 
 def _find_blocked_term(text: str) -> str | None:
@@ -148,6 +198,64 @@ def _find_blocked_term(text: str) -> str | None:
     return None
 
 
+def _is_internal_href(href: str) -> bool:
+    href = (href or "").strip()
+    if not href or href.startswith(("#", "mailto:", "tel:")):
+        return False
+    if href.startswith("/"):
+        return True
+    parsed = urlparse(href)
+    if not parsed.netloc:
+        return True
+    host = parsed.netloc.lower()
+    site = config.WP_SITE_DOMAIN
+    if not site:
+        return False
+    return host == site or host.endswith(f".{site}")
+
+
+def _count_internal_links(html: str) -> int:
+    from bs4 import BeautifulSoup
+
+    soup = BeautifulSoup(html or "", "html.parser")
+    count = 0
+    for a in soup.find_all("a", href=True):
+        if _is_internal_href(a.get("href", "")):
+            count += 1
+    return count
+
+
+def _link_label(url: str) -> str:
+    parsed = urlparse(url)
+    path = (parsed.path or "").strip("/")
+    if not path:
+        return "Inicio Montessori México"
+    parts = [p for p in path.split("/") if p][:4]
+    if not parts:
+        return "Recurso recomendado"
+    label = " ".join(part.replace("-", " ") for part in parts)
+    return label.title()[:80]
+
+
+def _ensure_internal_links(body: str) -> str:
+    if _count_internal_links(body) >= 1:
+        return body
+    links = [u for u in config.INTERNAL_LINKS if u]
+    if not links:
+        return body
+    items = "\n".join(
+        f'<li><a href="{link}">{_link_label(link)}</a></li>'
+        for link in links[:3]
+    )
+    block = (
+        "\n<h2>Recursos Internos Recomendados</h2>\n"
+        "<ul>\n"
+        f"{items}\n"
+        "</ul>\n"
+    )
+    return (body or "").rstrip() + block
+
+
 def _contains_blocked_mentions(post: GeneratedPost) -> str | None:
     candidates = [
         post.title,
@@ -156,6 +264,10 @@ def _contains_blocked_mentions(post: GeneratedPost) -> str | None:
         post.seo_title,
         post.seo_description,
         post.focus_keyphrase,
+        post.og_title,
+        post.og_description,
+        post.twitter_title,
+        post.twitter_description,
         post.image_alt_text,
         " ".join(post.tags),
     ]
@@ -169,19 +281,23 @@ def _contains_blocked_mentions(post: GeneratedPost) -> str | None:
 def _extract_focus_keyphrase(data: dict, title: str, tags: list[str]) -> str:
     explicit = _clean_spaces(str(data.get("focus_keyphrase", "")))
     if explicit:
-        return _truncate(explicit, 60)
+        words = explicit.split()
+        return _truncate(" ".join(words[: config.FOCUS_KEYPHRASE_MAX_WORDS]), 60)
     if tags:
-        return _truncate(tags[0], 60)
+        words = tags[0].split()
+        return _truncate(" ".join(words[: config.FOCUS_KEYPHRASE_MAX_WORDS]), 60)
     words = re.findall(r"[A-Za-zÁÉÍÓÚáéíóúÑñÜü0-9]+", title)
-    phrase = " ".join(words[:4]) if words else "Montessori México"
+    phrase = " ".join(words[: config.FOCUS_KEYPHRASE_MAX_WORDS]) if words else "Montessori México"
     return _truncate(phrase, 60)
 
 
 def _normalize_generated_post(data: dict) -> GeneratedPost:
     title = _truncate(
-        data.get("title", "Actualidad Montessori en México"), 70
+        data.get("title", "Actualidad Montessori en México"),
+        config.POST_TITLE_MAX_LEN,
     )
-    body = data.get("body", "")
+
+    body = _ensure_internal_links(data.get("body", ""))
     plain_text = _html_to_text(body)
 
     excerpt = _truncate(
@@ -190,7 +306,8 @@ def _normalize_generated_post(data: dict) -> GeneratedPost:
         add_ellipsis=True,
     )
     categories = [
-        _clean_spaces(str(c)) for c in data.get("categories", ["Educación Montessori"])
+        _clean_spaces(str(c))
+        for c in data.get("categories", ["Educación Montessori"])
         if _clean_spaces(str(c))
     ] or ["Educación Montessori"]
     tags = _normalize_tags(data.get("tags", []))
@@ -199,16 +316,43 @@ def _normalize_generated_post(data: dict) -> GeneratedPost:
 
     seo_title = _truncate(data.get("seo_title", "") or title, config.SEO_TITLE_MAX_LEN)
     if not _contains_keyphrase(seo_title, focus_keyphrase):
-        base_title = seo_title.rstrip(":,;.- ")
-        seo_title = _truncate(
-            f"{focus_keyphrase}: {base_title}",
-            config.SEO_TITLE_MAX_LEN,
-        )
+        seo_title = _truncate(f"{focus_keyphrase}: {seo_title}", config.SEO_TITLE_MAX_LEN)
+
     seo_description = _truncate(
         data.get("seo_description", "") or excerpt or plain_text,
         config.SEO_DESCRIPTION_MAX_LEN,
         add_ellipsis=True,
     )
+    seo_description = _ensure_keyphrase(seo_description, focus_keyphrase, config.SEO_DESCRIPTION_MAX_LEN)
+
+    og_title = _truncate(
+        data.get("og_title", "") or data.get("social_og_title", "") or seo_title,
+        config.SOCIAL_TITLE_MAX_LEN,
+    )
+    og_description = _truncate(
+        data.get("og_description", "") or data.get("social_og_description", "") or seo_description,
+        config.SOCIAL_DESCRIPTION_MAX_LEN,
+        add_ellipsis=True,
+    )
+    og_description = _ensure_keyphrase(og_description, focus_keyphrase, config.SOCIAL_DESCRIPTION_MAX_LEN)
+
+    twitter_title = _truncate(
+        data.get("twitter_title", "") or data.get("social_twitter_title", "") or og_title,
+        config.SOCIAL_TITLE_MAX_LEN,
+    )
+    twitter_description = _truncate(
+        data.get("twitter_description", "") or data.get("social_twitter_description", "") or og_description,
+        config.SOCIAL_DESCRIPTION_MAX_LEN,
+        add_ellipsis=True,
+    )
+    twitter_description = _ensure_keyphrase(
+        twitter_description,
+        focus_keyphrase,
+        config.SOCIAL_DESCRIPTION_MAX_LEN,
+    )
+
+    source_raw = _clean_spaces(str(data.get("social_image_source", ""))).lower()
+    social_image_source = source_raw if source_raw in {"featured_media", "custom_url"} else "featured_media"
 
     image_alt_text = _truncate(
         data.get("image_alt_text", "") or f"{title} - imagen de portada Montessori",
@@ -224,6 +368,11 @@ def _normalize_generated_post(data: dict) -> GeneratedPost:
         seo_title=seo_title,
         seo_description=seo_description,
         focus_keyphrase=focus_keyphrase,
+        og_title=og_title,
+        og_description=og_description,
+        twitter_title=twitter_title,
+        twitter_description=twitter_description,
+        social_image_source=social_image_source,
         image_prompt=_clean_spaces(data.get("image_prompt", "")),
         image_alt_text=image_alt_text,
     )
@@ -271,7 +420,9 @@ def generate_post(
             if word_count < config.MIN_BODY_WORDS:
                 logger.warning(
                     "Attempt %d: body too short (%d words < %d), retrying/aborting",
-                    attempt + 1, word_count, config.MIN_BODY_WORDS,
+                    attempt + 1,
+                    word_count,
+                    config.MIN_BODY_WORDS,
                 )
                 if attempt < max_retries - 1:
                     continue
@@ -282,14 +433,13 @@ def generate_post(
             if blocked:
                 logger.warning(
                     "Attempt %d: post contains blocked term '%s', retrying/aborting",
-                    attempt + 1, blocked,
+                    attempt + 1,
+                    blocked,
                 )
                 if attempt < max_retries - 1:
                     continue
                 return None
-            logger.info(
-                "Artículo generado: '%s' (%d palabras)", post.title, word_count
-            )
+            logger.info("Artículo generado: '%s' (%d palabras)", post.title, word_count)
             return post
 
         except Exception as exc:

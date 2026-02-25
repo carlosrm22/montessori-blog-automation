@@ -76,10 +76,15 @@ Variables principales:
 - `NOTIFICATIONS_ENABLED`: activa avisos al crear borradores (default `1`).
 - `NOTIFY_WEBHOOK_URL`: webhook para recibir alertas (Slack/Discord/Make/n8n, opcional).
 - `TELEGRAM_BOT_TOKEN` y `TELEGRAM_CHAT_ID`: canal alterno de alertas por Telegram.
+- `POST_TITLE_MAX_LEN`: máximo de caracteres para el título del post (default `60`).
 - `SEO_TITLE_MAX_LEN`: máximo de caracteres para SEO title (default `60`).
 - `SEO_DESCRIPTION_MAX_LEN`: máximo de caracteres para meta description (default `155`).
+- `SOCIAL_TITLE_MAX_LEN`: máximo de caracteres para títulos sociales OG/Twitter (default `60`).
+- `SOCIAL_DESCRIPTION_MAX_LEN`: máximo de caracteres para descripciones sociales OG/Twitter (default `155`).
+- `FOCUS_KEYPHRASE_MAX_WORDS`: máximo de palabras para la keyphrase principal (default `5`).
 - `EXCERPT_MAX_LEN`: máximo de caracteres para excerpt (default `160`).
 - `MAX_TAGS`: máximo de tags por post (default `10`).
+- `INTERNAL_LINKS`: lista de enlaces internos separados por coma para inyección automática si faltan links internos.
 - `WP_IMAGE_WIDTH` / `WP_IMAGE_HEIGHT`: dimensiones objetivo de portada.
 - `WP_IMAGE_QUALITY`: calidad JPEG inicial (1-100).
 - `WP_IMAGE_MAX_KB`: peso objetivo máximo de imagen.
@@ -186,6 +191,8 @@ Ejemplo para correr todos los días a las 08:00:
 - Se actualizan `alt_text`, `caption` y `description` de la imagen destacada para accesibilidad.
 - El scoring penaliza páginas evergreen (home/about/wiki) y prioriza contenido más noticioso/reciente.
 - El SEO gate local calcula `TruSEO-like` y `Headline score`; si no pasan umbral se marca `seo_failed` y no publica.
+- Se exige `title` corto (<=60), focus keyphrase en meta description, al menos un enlace interno y metadatos sociales OG/X.
+- Si la fuente no tiene URL pública válida (por ejemplo dominios `.local`), no se genera enlace roto en la atribución.
 - El orden de publicación rota automáticamente por `topic_id` tomando como referencia el último borrador publicado.
 - Cuando se crea un borrador, el sistema puede enviar una notificación con título, autor, puntajes SEO y enlace directo de edición.
 
