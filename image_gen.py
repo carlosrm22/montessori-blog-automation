@@ -6,7 +6,7 @@ import time
 from pathlib import Path
 
 from google import genai
-from PIL import Image
+from PIL import Image, ImageOps
 
 import config
 
@@ -16,6 +16,13 @@ MODEL = config.GEMINI_IMAGE_MODEL
 TARGET_SIZE = (config.WP_IMAGE_WIDTH, config.WP_IMAGE_HEIGHT)
 JPEG_QUALITY = config.WP_IMAGE_QUALITY
 MAX_IMAGE_BYTES = config.WP_IMAGE_MAX_KB * 1024
+
+
+def _prepare_cover_image(img: Image.Image) -> Image.Image:
+    """Normalize orientation and fit target size without distortion."""
+    img = ImageOps.exif_transpose(img).convert("RGB")
+    # Crop-to-fit keeps aspect ratio and avoids stretching.
+    return ImageOps.fit(img, TARGET_SIZE, method=Image.LANCZOS, centering=(0.5, 0.5))
 
 
 def _save_optimized_jpeg(img: Image.Image, output_path: Path) -> None:
@@ -57,7 +64,7 @@ def generate_cover_image(
         f"{prompt} "
         "Style: professional editorial photography, warm lighting, "
         "clean composition, suitable for a blog header. "
-        "No text overlay. High quality. 16:9 aspect ratio."
+        "No text overlay. High quality. Wide 1.91:1 aspect ratio (1200x630)."
     )
 
     client = genai.Client(api_key=config.GEMINI_API_KEY)
@@ -76,9 +83,9 @@ def generate_cover_image(
             for part in response.candidates[0].content.parts:
                 if part.inline_data and part.inline_data.mime_type.startswith("image/"):
                     image_bytes = part.inline_data.data
-                    img = Image.open(io.BytesIO(image_bytes))
-                    img = img.convert("RGB")
-                    img = img.resize(TARGET_SIZE, Image.LANCZOS)
+                    source_img = Image.open(io.BytesIO(image_bytes))
+                    source_size = source_img.size
+                    img = _prepare_cover_image(source_img)
 
                     timestamp = int(time.time())
                     output_path = output_dir / f"cover_{timestamp}.jpg"
@@ -86,8 +93,8 @@ def generate_cover_image(
 
                     size_kb = output_path.stat().st_size / 1024
                     logger.info(
-                        "Cover image saved: %s (%dx%d, %.1f KB)",
-                        output_path, *TARGET_SIZE, size_kb,
+                        "Cover image saved: %s (source=%dx%d -> %dx%d, %.1f KB)",
+                        output_path, source_size[0], source_size[1], *TARGET_SIZE, size_kb,
                     )
                     return output_path
 
