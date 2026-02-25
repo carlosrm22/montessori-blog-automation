@@ -173,6 +173,34 @@ def get_last_published_topic_id(
     return str(row[0] or "").strip() or None
 
 
+def count_processed_by_status(
+    statuses: tuple[str, ...] = ("published_draft",),
+    topic_id: str | None = None,
+) -> int:
+    """Count rows by status, optionally filtered by topic."""
+    if not statuses:
+        return 0
+    placeholders = ",".join("?" for _ in statuses)
+    sql = (
+        "SELECT COUNT(*) FROM processed_articles "
+        f"WHERE status IN ({placeholders})"
+    )
+    params: list[str] = list(statuses)
+    if topic_id:
+        sql += " AND topic_id = ?"
+        params.append(topic_id)
+
+    with _connect() as conn:
+        _migrate_if_needed(conn)
+        row = conn.execute(sql, params).fetchone()
+    if not row:
+        return 0
+    try:
+        return int(row[0])
+    except Exception:
+        return 0
+
+
 def save_seo_report(
     *,
     topic_id: str,

@@ -84,7 +84,12 @@ Variables principales:
 - `FOCUS_KEYPHRASE_MAX_WORDS`: máximo de palabras para la keyphrase principal (default `5`).
 - `EXCERPT_MAX_LEN`: máximo de caracteres para excerpt (default `160`).
 - `MAX_TAGS`: máximo de tags por post (default `10`).
-- `INTERNAL_LINKS`: lista de enlaces internos separados por coma para inyección automática si faltan links internos.
+- `INTERNAL_LINKS`: fallback de enlaces internos reales (se usa solo si no hay enlaces internos válidos tras limpiar el contenido).
+- `LINK_VALIDATION_ENABLED`: valida enlaces HTTP antes de publicar (`1` por defecto).
+- `LINK_CHECK_TIMEOUT`: timeout (segundos) para validar cada URL (default `8`).
+- `RECENT_POSTS_GALLERY_COUNT`: número de posts publicados reales a insertar en la galería final (default `4`, `0` = deshabilitar).
+- `PREFERRED_EXTERNAL_LINK_EVERY`: inserta un enlace externo recomendado cada N publicaciones (default `3`, `0` = deshabilitar).
+- `PREFERRED_EXTERNAL_LINKS`: lista de dominios externos recomendados separados por coma (rotación automática).
 - `WP_IMAGE_WIDTH` / `WP_IMAGE_HEIGHT`: dimensiones objetivo de portada.
 - `WP_IMAGE_QUALITY`: calidad JPEG inicial (1-100).
 - `WP_IMAGE_MAX_KB`: peso objetivo máximo de imagen.
@@ -192,6 +197,9 @@ Ejemplo para correr todos los días a las 08:00:
 - El scoring penaliza páginas evergreen (home/about/wiki) y prioriza contenido más noticioso/reciente.
 - El SEO gate local calcula `TruSEO-like` y `Headline score`; si no pasan umbral se marca `seo_failed` y no publica.
 - Se exige `title` corto (<=60), focus keyphrase en meta description, al menos un enlace interno y metadatos sociales OG/X.
+- Antes de publicar, se limpian enlaces rotos/inválidos y solo se conservan URLs verificadas.
+- La galería final de "Publicaciones Recientes" usa posts reales publicados en WordPress (no enlaces inventados).
+- Cada cierto número de publicaciones se añade un recurso externo recomendado en rotación (`PREFERRED_EXTERNAL_LINKS`).
 - Si la fuente no tiene URL pública válida (por ejemplo dominios `.local`), no se genera enlace roto en la atribución.
 - El enfoque editorial es internacional por defecto; se añade contexto local solo cuando realmente aporta.
 - El orden de publicación rota automáticamente por `topic_id` tomando como referencia el último borrador publicado.

@@ -4,6 +4,7 @@ import logging
 import re
 import time
 import unicodedata
+from html import unescape
 from pathlib import Path
 
 import httpx
@@ -279,6 +280,60 @@ def _sync_aioseo(post_id: int, post: GeneratedPost) -> None:
             logger.warning("AIOSEO sync returned non-success for post id=%d: %s", post_id, data)
     except Exception:
         logger.warning("AIOSEO sync response parse failed for post id=%d", post_id)
+
+
+def list_recent_published_posts(limit: int = 6, exclude_ids: set[int] | None = None) -> list[dict]:
+    """Return recent published posts with canonical link and optional featured image."""
+    if limit <= 0:
+        return []
+    exclude_ids = exclude_ids or set()
+    per_page = max(1, min(limit * 3, 30))
+    params = {
+        "status": "publish",
+        "orderby": "date",
+        "order": "desc",
+        "per_page": per_page,
+        "_embed": "wp:featuredmedia",
+    }
+    resp = _request("get", "posts", params=params, retry_on_500=False)
+    if not resp:
+        return []
+
+    posts: list[dict] = []
+    for item in resp.json():
+        try:
+            post_id = int(item.get("id"))
+        except Exception:
+            continue
+        if post_id in exclude_ids:
+            continue
+        link = str(item.get("link", "")).strip()
+        raw_title = str(item.get("title", {}).get("rendered", "")).strip()
+        title = unescape(re.sub(r"<[^>]+>", "", raw_title)).strip()
+        if not link or not title:
+            continue
+
+        image_url = ""
+        image_alt = ""
+        embedded = item.get("_embedded", {})
+        media_list = embedded.get("wp:featuredmedia", []) if isinstance(embedded, dict) else []
+        if isinstance(media_list, list) and media_list:
+            media = media_list[0] or {}
+            image_url = str(media.get("source_url", "")).strip()
+            image_alt = str(media.get("alt_text", "")).strip()
+
+        posts.append(
+            {
+                "id": post_id,
+                "url": link,
+                "title": title,
+                "image_url": image_url,
+                "image_alt": image_alt,
+            }
+        )
+        if len(posts) >= limit:
+            break
+    return posts
 
 
 def create_draft(

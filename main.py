@@ -10,11 +10,12 @@ from search import search_all
 from scorer import select_best
 from content import generate_post
 from image_gen import generate_cover_image
-from wordpress import upload_media, create_draft
+from wordpress import upload_media, create_draft, list_recent_published_posts
 from source_fetch import enrich_article
 from topics import TopicProfile, load_topics
 from seo_rules import analyze_headline, analyze_truseo, build_slug
 from notifier import notify_draft_created
+from link_optimizer import sanitize_and_enrich_body
 
 logger = logging.getLogger(__name__)
 
@@ -66,6 +67,21 @@ def _rotate_topics(topics: list[TopicProfile]) -> list[TopicProfile]:
     return rotated
 
 
+def _pick_preferred_external_url() -> str:
+    links = [url for url in config.PREFERRED_EXTERNAL_LINKS if url]
+    every = config.PREFERRED_EXTERNAL_LINK_EVERY
+    if not links or every <= 0:
+        return ""
+
+    published_count = state.count_processed_by_status(statuses=("published_draft",))
+    next_publication_number = published_count + 1
+    if next_publication_number % every != 0:
+        return ""
+
+    rotation_index = (next_publication_number // every - 1) % len(links)
+    return links[rotation_index]
+
+
 def run_topic_pipeline(topic: TopicProfile) -> bool:
     """Execute full pipeline for one topic. Returns True if a post was created."""
     logger.info("=== Topic: %s (%s) ===", topic.name, topic.topic_id)
@@ -109,6 +125,30 @@ def run_topic_pipeline(topic: TopicProfile) -> bool:
         return False
     if topic.categories:
         post.categories = topic.categories
+
+    recent_posts: list[dict] = []
+    if config.RECENT_POSTS_GALLERY_COUNT > 0:
+        recent_posts = list_recent_published_posts(limit=config.RECENT_POSTS_GALLERY_COUNT)
+    preferred_external_url = _pick_preferred_external_url()
+    post.body, link_stats = sanitize_and_enrich_body(
+        html=post.body,
+        source_url=article.url,
+        recent_posts=recent_posts,
+        preferred_external_url=preferred_external_url,
+    )
+    logger.info(
+        (
+            "Link hygiene [%s]: internos=%d, externos=%d, "
+            "gallery_items=%d, links_removidos=%d, preferred_external=%s, preferred_added=%s"
+        ),
+        topic.topic_id,
+        link_stats.get("internal_links", 0),
+        link_stats.get("external_links", 0),
+        link_stats.get("gallery_links", 0),
+        link_stats.get("removed_links", 0),
+        preferred_external_url or "none",
+        link_stats.get("preferred_external_added", False),
+    )
 
     # 3.5 Local SEO gate (TruSEO-like + Headline) without AIOSEO API.
     truseo_score = None

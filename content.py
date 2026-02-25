@@ -297,7 +297,7 @@ def _normalize_generated_post(data: dict) -> GeneratedPost:
         config.POST_TITLE_MAX_LEN,
     )
 
-    body = _ensure_internal_links(data.get("body", ""))
+    body = data.get("body", "")
     plain_text = _html_to_text(body)
 
     excerpt = _truncate(

@@ -63,6 +63,23 @@ def validate() -> None:
     if SOURCE_FETCH_MAX_CHARS < 2000:
         logging.critical("SOURCE_FETCH_MAX_CHARS debe ser al menos 2000")
         sys.exit(1)
+    if LINK_CHECK_TIMEOUT <= 0:
+        logging.critical("LINK_CHECK_TIMEOUT debe ser mayor a 0")
+        sys.exit(1)
+    if RECENT_POSTS_GALLERY_COUNT < 0:
+        logging.critical("RECENT_POSTS_GALLERY_COUNT no puede ser negativo")
+        sys.exit(1)
+    if PREFERRED_EXTERNAL_LINK_EVERY < 0:
+        logging.critical("PREFERRED_EXTERNAL_LINK_EVERY no puede ser negativo")
+        sys.exit(1)
+    for external_url in PREFERRED_EXTERNAL_LINKS:
+        parsed = urlparse(external_url)
+        if parsed.scheme not in {"http", "https"} or not parsed.netloc:
+            logging.critical(
+                "PREFERRED_EXTERNAL_LINKS contiene URL inválida: %s",
+                external_url,
+            )
+            sys.exit(1)
     if TOPICS_MAX_POSTS_PER_RUN <= 0:
         logging.critical("TOPICS_MAX_POSTS_PER_RUN debe ser mayor a 0")
         sys.exit(1)
@@ -175,6 +192,22 @@ WP_IMAGE_QUALITY = int(os.environ.get("WP_IMAGE_QUALITY", "90"))
 WP_IMAGE_MAX_KB = int(os.environ.get("WP_IMAGE_MAX_KB", "450"))
 SOURCE_FETCH_ENABLED = os.environ.get("SOURCE_FETCH_ENABLED", "1") == "1"
 SOURCE_FETCH_MAX_CHARS = int(os.environ.get("SOURCE_FETCH_MAX_CHARS", "15000"))
+LINK_VALIDATION_ENABLED = os.environ.get("LINK_VALIDATION_ENABLED", "1") == "1"
+LINK_CHECK_TIMEOUT = int(os.environ.get("LINK_CHECK_TIMEOUT", "8"))
+RECENT_POSTS_GALLERY_COUNT = int(os.environ.get("RECENT_POSTS_GALLERY_COUNT", "4"))
+PREFERRED_EXTERNAL_LINK_EVERY = int(os.environ.get("PREFERRED_EXTERNAL_LINK_EVERY", "3"))
+PREFERRED_EXTERNAL_LINKS = [
+    u.strip()
+    for u in os.environ.get(
+        "PREFERRED_EXTERNAL_LINKS",
+        (
+            "https://certificacionmontessori.com,"
+            "https://asociacionmontessori.com.mx,"
+            "https://kalpilli.com"
+        ),
+    ).split(",")
+    if u.strip()
+]
 TOPIC_IDS = [
     t.strip()
     for t in os.environ.get("TOPIC_IDS", "").split(",")
