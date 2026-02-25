@@ -36,7 +36,7 @@ def score_article(article: SearchResult) -> float | None:
     try:
         client = genai.Client(api_key=config.GEMINI_API_KEY)
         response = client.models.generate_content(
-            model="gemini-2.0-flash",
+            model=config.GEMINI_TEXT_MODEL,
             contents=prompt,
         )
         text = response.text.strip()

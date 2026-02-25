@@ -48,7 +48,7 @@ def generate_post(article: SearchResult, max_retries: int = 2) -> GeneratedPost 
     for attempt in range(max_retries):
         try:
             response = client.models.generate_content(
-                model="gemini-2.0-flash",
+                model=config.GEMINI_TEXT_MODEL,
                 contents=prompt,
             )
             text = response.text.strip()

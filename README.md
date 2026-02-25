@@ -51,6 +51,8 @@ Variables principales:
 - `SEARCH_QUERIES`: consultas separadas por coma.
 - `MIN_USABILITY_SCORE`: umbral mínimo para publicar.
 - `DRY_RUN`: `1` para simular sin publicar; `0` para publicar borradores.
+- `GEMINI_TEXT_MODEL`: modelo para scoring y generación de texto (default `gemini-2.5-flash`).
+- `GEMINI_IMAGE_MODEL`: modelo para portada (default `gemini-2.5-flash-image`).
 
 ## Ejecución
 

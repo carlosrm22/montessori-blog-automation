@@ -57,6 +57,8 @@ SEARCH_QUERIES = [
 
 MIN_USABILITY_SCORE = float(os.environ.get("MIN_USABILITY_SCORE", "0.6"))
 DRY_RUN = os.environ.get("DRY_RUN", "0") == "1"
+GEMINI_TEXT_MODEL = os.environ.get("GEMINI_TEXT_MODEL", "gemini-2.5-flash")
+GEMINI_IMAGE_MODEL = os.environ.get("GEMINI_IMAGE_MODEL", "gemini-2.5-flash-image")
 DB_PATH = DATA_DIR / "blog_state.db"
 
 

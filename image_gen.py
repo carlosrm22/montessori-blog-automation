@@ -13,7 +13,7 @@ import config
 
 logger = logging.getLogger(__name__)
 
-MODEL = "gemini-2.5-flash-preview-image-generation"
+MODEL = config.GEMINI_IMAGE_MODEL
 TARGET_SIZE = (1200, 630)
 JPEG_QUALITY = 90
 
