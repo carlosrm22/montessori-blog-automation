@@ -84,6 +84,8 @@ Variables principales:
 - `FOCUS_KEYPHRASE_MAX_WORDS`: máximo de palabras para la keyphrase principal (default `5`).
 - `EXCERPT_MAX_LEN`: máximo de caracteres para excerpt (default `160`).
 - `MAX_TAGS`: máximo de tags por post (default `10`).
+- `SITE_TITLE`: nombre del sitio para títulos SEO/social (ej. `Asociación Montessori de México`).
+- `TITLE_SEPARATOR`: separador entre título de entrada y nombre del sitio (ej. `|`).
 - `INTERNAL_LINKS`: fallback de enlaces internos reales (se usa solo si no hay enlaces internos válidos tras limpiar el contenido).
 - `LINK_VALIDATION_ENABLED`: valida enlaces HTTP antes de publicar (`1` por defecto).
 - `LINK_CHECK_TIMEOUT`: timeout (segundos) para validar cada URL (default `8`).
@@ -197,6 +199,7 @@ Ejemplo para correr todos los días a las 08:00:
 - El scoring penaliza páginas evergreen (home/about/wiki) y prioriza contenido más noticioso/reciente.
 - El SEO gate local calcula `TruSEO-like` y `Headline score`; si no pasan umbral se marca `seo_failed` y no publica.
 - Se exige `title` corto (<=60), focus keyphrase en meta description, al menos un enlace interno y metadatos sociales OG/X.
+- `seo_title`, `og_title` y `twitter_title` se normalizan al formato `Título | Sitio` (configurable).
 - Antes de publicar, se limpian enlaces rotos/inválidos y solo se conservan URLs verificadas.
 - La galería final de "Publicaciones Recientes" usa posts reales publicados en WordPress (no enlaces inventados).
 - Cada cierto número de publicaciones se añade un recurso externo recomendado en rotación (`PREFERRED_EXTERNAL_LINKS`).

@@ -60,6 +60,7 @@ No se pudo extraer el texto completo de la fuente. Usa el fragmento y mantén af
 3. `twitter_title` <= 60 caracteres
 4. `twitter_description` <= 155 caracteres
 5. `social_image_source`: usar `featured_media`
+6. En `seo_title`, `og_title` y `twitter_title` usar formato: "Título {{ title_separator }} {{ site_title }}"
 
 ## Reglas de imagen y accesibilidad
 1. `image_prompt` en inglés, estilo editorial fotográfico, sin texto incrustado

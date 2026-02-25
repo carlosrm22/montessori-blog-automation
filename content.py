@@ -99,6 +99,8 @@ def _render_prompt(
     return template.render(
         topic_name=topic_name,
         topic_writing_guidelines=topic_writing_guidelines,
+        site_title=config.SITE_TITLE,
+        title_separator=config.TITLE_SEPARATOR,
         title=article.title,
         url=article.url,
         source_public_url=source_public_url,
@@ -180,6 +182,39 @@ def _ensure_keyphrase(text: str, keyphrase: str, max_len: int) -> str:
     if _contains_keyphrase(text, keyphrase):
         return text
     return _truncate(f"{keyphrase}: {text}", max_len, add_ellipsis=True)
+
+
+def _with_site_suffix(title: str, max_len: int) -> str:
+    base = _truncate(title, max_len)
+    site_title = _clean_spaces(config.SITE_TITLE)
+    separator = _clean_spaces(config.TITLE_SEPARATOR) or "|"
+    if not site_title:
+        return base
+    base_norm = _normalize_for_compare(base)
+    site_norm = _normalize_for_compare(site_title)
+    if site_norm and site_norm in base_norm:
+        return base
+
+    suffix = f" {separator} {site_title}"
+    if len(base) + len(suffix) <= max_len:
+        return f"{base}{suffix}"
+
+    allowed_base_len = max_len - len(suffix)
+    if allowed_base_len <= 10:
+        # If max_len is too short, keep a usable plain title.
+        return _truncate(base, max_len)
+    base_cut = _truncate(base, allowed_base_len).rstrip(" :;,-|/")
+    return f"{base_cut}{suffix}"
+
+
+def _max_base_len_with_site_suffix(max_len: int) -> int:
+    site_title = _clean_spaces(config.SITE_TITLE)
+    separator = _clean_spaces(config.TITLE_SEPARATOR) or "|"
+    if not site_title:
+        return max_len
+    suffix_len = len(f" {separator} {site_title}")
+    # Keep enough room for a meaningful base title.
+    return max(15, max_len - suffix_len)
 
 
 def _find_blocked_term(text: str) -> str | None:
@@ -314,9 +349,22 @@ def _normalize_generated_post(data: dict) -> GeneratedPost:
 
     focus_keyphrase = _extract_focus_keyphrase(data, title, tags)
 
-    seo_title = _truncate(data.get("seo_title", "") or title, config.SEO_TITLE_MAX_LEN)
-    if not _contains_keyphrase(seo_title, focus_keyphrase):
-        seo_title = _truncate(f"{focus_keyphrase}: {seo_title}", config.SEO_TITLE_MAX_LEN)
+    seo_base_max_len = _max_base_len_with_site_suffix(config.SEO_TITLE_MAX_LEN)
+    seo_base = _truncate(data.get("seo_title", "") or title, seo_base_max_len)
+    if not _contains_keyphrase(seo_base, focus_keyphrase):
+        key_words = focus_keyphrase.split()
+        seo_words = seo_base.split()
+        if (
+            key_words
+            and seo_words
+            and _normalize_for_compare(key_words[0]) == _normalize_for_compare(seo_words[0])
+        ):
+            merged = " ".join([focus_keyphrase, *seo_words[1:]])
+        else:
+            merged = f"{focus_keyphrase} {seo_base}"
+        seo_base = _truncate(merged, seo_base_max_len)
+    seo_title = seo_base
+    seo_title = _with_site_suffix(seo_title, config.SEO_TITLE_MAX_LEN)
 
     seo_description = _truncate(
         data.get("seo_description", "") or excerpt or plain_text,
@@ -329,6 +377,7 @@ def _normalize_generated_post(data: dict) -> GeneratedPost:
         data.get("og_title", "") or data.get("social_og_title", "") or seo_title,
         config.SOCIAL_TITLE_MAX_LEN,
     )
+    og_title = _with_site_suffix(og_title, config.SOCIAL_TITLE_MAX_LEN)
     og_description = _truncate(
         data.get("og_description", "") or data.get("social_og_description", "") or seo_description,
         config.SOCIAL_DESCRIPTION_MAX_LEN,
@@ -340,6 +389,7 @@ def _normalize_generated_post(data: dict) -> GeneratedPost:
         data.get("twitter_title", "") or data.get("social_twitter_title", "") or og_title,
         config.SOCIAL_TITLE_MAX_LEN,
     )
+    twitter_title = _with_site_suffix(twitter_title, config.SOCIAL_TITLE_MAX_LEN)
     twitter_description = _truncate(
         data.get("twitter_description", "") or data.get("social_twitter_description", "") or og_description,
         config.SOCIAL_DESCRIPTION_MAX_LEN,
@@ -351,8 +401,7 @@ def _normalize_generated_post(data: dict) -> GeneratedPost:
         config.SOCIAL_DESCRIPTION_MAX_LEN,
     )
 
-    source_raw = _clean_spaces(str(data.get("social_image_source", ""))).lower()
-    social_image_source = source_raw if source_raw in {"featured_media", "custom_url"} else "featured_media"
+    social_image_source = "featured_media"
 
     image_alt_text = _truncate(
         data.get("image_alt_text", "") or f"{title} - imagen de portada Montessori",

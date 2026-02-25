@@ -104,6 +104,12 @@ def validate() -> None:
     if FOCUS_KEYPHRASE_MAX_WORDS < 2 or FOCUS_KEYPHRASE_MAX_WORDS > 8:
         logging.critical("FOCUS_KEYPHRASE_MAX_WORDS debe estar entre 2 y 8")
         sys.exit(1)
+    if not SITE_TITLE:
+        logging.critical("SITE_TITLE no puede estar vacío")
+        sys.exit(1)
+    if not TITLE_SEPARATOR.strip():
+        logging.critical("TITLE_SEPARATOR no puede estar vacío")
+        sys.exit(1)
 
 
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")
@@ -186,6 +192,8 @@ SOCIAL_DESCRIPTION_MAX_LEN = int(os.environ.get("SOCIAL_DESCRIPTION_MAX_LEN", "1
 FOCUS_KEYPHRASE_MAX_WORDS = int(os.environ.get("FOCUS_KEYPHRASE_MAX_WORDS", "5"))
 EXCERPT_MAX_LEN = int(os.environ.get("EXCERPT_MAX_LEN", "160"))
 MAX_TAGS = int(os.environ.get("MAX_TAGS", "10"))
+SITE_TITLE = os.environ.get("SITE_TITLE", "Asociación Montessori de México").strip()
+TITLE_SEPARATOR = os.environ.get("TITLE_SEPARATOR", "|").strip()
 WP_IMAGE_WIDTH = int(os.environ.get("WP_IMAGE_WIDTH", "1200"))
 WP_IMAGE_HEIGHT = int(os.environ.get("WP_IMAGE_HEIGHT", "630"))
 WP_IMAGE_QUALITY = int(os.environ.get("WP_IMAGE_QUALITY", "90"))
