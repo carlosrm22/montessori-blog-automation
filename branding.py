@@ -3,9 +3,10 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any
 
-from PIL import Image, ImageEnhance
+from PIL import Image, ImageEnhance, ImageOps
 import yaml
 
 import config
@@ -27,6 +28,17 @@ class BrandKit:
     prompt_prefix: str
     negative: str
     postprocess: BrandPostProcess
+    logo: "BrandLogoSettings"
+
+
+@dataclass(frozen=True)
+class BrandLogoSettings:
+    enabled: bool = False
+    path: str = ""
+    position: str = "bottom_right"
+    scale: float = 0.14
+    opacity: float = 0.16
+    margin_px: int = 24
 
 
 def _hex_to_rgb(hex_color: str) -> tuple[int, int, int]:
@@ -43,6 +55,17 @@ def _safe_float(value: Any, fallback: float) -> float:
         return float(value)
     except (TypeError, ValueError):
         return fallback
+
+
+def _safe_int(value: Any, fallback: int) -> int:
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return fallback
+
+
+def _clamp(value: float, minimum: float, maximum: float) -> float:
+    return max(minimum, min(maximum, value))
 
 
 def load_brand_kit(brand_id: str | None = None) -> BrandKit:
@@ -68,6 +91,7 @@ def load_brand_kit(brand_id: str | None = None) -> BrandKit:
         resolved_brand = chosen_brand
 
     postprocess = data.get("postprocess", {}) if isinstance(data.get("postprocess", {}), dict) else {}
+    logo_data = data.get("logo", {}) if isinstance(data.get("logo", {}), dict) else {}
     return BrandKit(
         brand_id=resolved_brand,
         display_name=str(data.get("display_name", resolved_brand or "brand")).strip(),
@@ -79,6 +103,14 @@ def load_brand_kit(brand_id: str | None = None) -> BrandKit:
             tint_opacity=max(0.0, min(1.0, _safe_float(postprocess.get("tint_opacity"), 0.0))),
             contrast=max(0.5, min(1.8, _safe_float(postprocess.get("contrast"), 1.0))),
             saturation=max(0.5, min(1.8, _safe_float(postprocess.get("saturation"), 1.0))),
+        ),
+        logo=BrandLogoSettings(
+            enabled=bool(logo_data.get("enabled", False)),
+            path=str(logo_data.get("path", "")).strip(),
+            position=str(logo_data.get("position", "bottom_right")).strip().lower(),
+            scale=_clamp(_safe_float(logo_data.get("scale"), 0.14), 0.05, 0.5),
+            opacity=_clamp(_safe_float(logo_data.get("opacity"), 0.16), 0.05, 1.0),
+            margin_px=max(0, _safe_int(logo_data.get("margin_px"), 24)),
         ),
     )
 
@@ -132,4 +164,75 @@ def apply_brand_look(img: Image.Image, kit: BrandKit) -> Image.Image:
         output = ImageEnhance.Contrast(output).enhance(pp.contrast)
     if abs(pp.saturation - 1.0) > 1e-3:
         output = ImageEnhance.Color(output).enhance(pp.saturation)
-    return output
+    return _apply_logo_overlay(output, kit.logo)
+
+
+def _resolve_logo_path(raw_path: str) -> Path:
+    logo_path = Path((raw_path or "").strip()).expanduser()
+    if logo_path.is_absolute():
+        return logo_path
+    return (config.BASE_DIR / logo_path).resolve()
+
+
+def _build_logo_alpha_channel(alpha: Image.Image, opacity: float) -> Image.Image:
+    return alpha.point(lambda value: int(value * opacity))
+
+
+def _logo_position(
+    canvas_w: int,
+    canvas_h: int,
+    logo_w: int,
+    logo_h: int,
+    position: str,
+    margin: int,
+) -> tuple[int, int]:
+    if position == "bottom_left":
+        return (margin, canvas_h - logo_h - margin)
+    if position == "top_right":
+        return (canvas_w - logo_w - margin, margin)
+    if position == "top_left":
+        return (margin, margin)
+    if position == "center":
+        return ((canvas_w - logo_w) // 2, (canvas_h - logo_h) // 2)
+    return (canvas_w - logo_w - margin, canvas_h - logo_h - margin)
+
+
+def _apply_logo_overlay(img: Image.Image, logo_cfg: BrandLogoSettings) -> Image.Image:
+    """Overlay one logo with conservative opacity and scale."""
+    if not config.BRAND_LOGO_ENABLED:
+        return img
+    if not logo_cfg.enabled or not logo_cfg.path:
+        return img
+
+    logo_path = _resolve_logo_path(logo_cfg.path)
+    if not logo_path.exists():
+        return img
+
+    try:
+        logo = ImageOps.exif_transpose(Image.open(logo_path)).convert("RGBA")
+    except Exception:
+        return img
+
+    canvas = img.convert("RGBA")
+    target_width = max(1, int(canvas.width * logo_cfg.scale))
+    if logo.width <= 0 or logo.height <= 0:
+        return img
+    ratio = target_width / logo.width
+    target_height = max(1, int(logo.height * ratio))
+    logo = logo.resize((target_width, target_height), Image.LANCZOS)
+
+    alpha = logo.getchannel("A")
+    logo.putalpha(_build_logo_alpha_channel(alpha, logo_cfg.opacity))
+
+    x, y = _logo_position(
+        canvas.width,
+        canvas.height,
+        logo.width,
+        logo.height,
+        logo_cfg.position,
+        logo_cfg.margin_px,
+    )
+    x = max(0, min(canvas.width - logo.width, x))
+    y = max(0, min(canvas.height - logo.height, y))
+    canvas.alpha_composite(logo, dest=(x, y))
+    return canvas.convert("RGB")

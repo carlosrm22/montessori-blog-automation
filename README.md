@@ -88,6 +88,7 @@ Variables principales:
 - `TITLE_SEPARATOR`: separador entre título de entrada y nombre del sitio (ej. `|`).
 - `BRAND_KIT`: kit visual global para portadas (`ammac` o `kalpilli`).
 - `BRAND_KITS_FILE`: ruta al archivo YAML de brand kits (default `brand_kits.yml`).
+- `BRAND_LOGO_ENABLED`: habilita superposición del logo del brand kit en la portada (`0` por defecto, recomendado activar primero en pruebas).
 - `INTERNAL_LINKS`: fallback de enlaces internos reales (se usa solo si no hay enlaces internos válidos tras limpiar el contenido).
 - `LINK_VALIDATION_ENABLED`: valida enlaces HTTP antes de publicar (`1` por defecto).
 - `LINK_CHECK_TIMEOUT`: timeout (segundos) para validar cada URL (default `8`).
@@ -120,6 +121,7 @@ El archivo [`brand_kits.yml`](/home/carlos/montessori-blog-automation/brand_kits
 - `palette`
 - `negative`
 - `postprocess` (tinte, contraste, saturación)
+- `logo` (ruta, posición, escala, opacidad y margen)
 
 ## Ejecución
 
@@ -178,6 +180,7 @@ Ejemplo para correr todos los días a las 08:00:
 ├── source_fetch.py  # Fetch + extracción de contenido de la fuente
 ├── image_gen.py     # Generación de portada con Gemini
 ├── branding.py      # Brand kits (prompt wrapper + postproceso visual)
+├── assets/logos/    # Logos para overlay opcional en portadas
 ├── wordpress.py     # Publicación de borradores vía WP REST API
 ├── notifier.py      # Envío de alertas al crear borradores
 ├── state.py         # Persistencia SQLite de URLs procesadas
@@ -213,6 +216,7 @@ Ejemplo para correr todos los días a las 08:00:
 - Se exige `title` corto (<=60), focus keyphrase en meta description, al menos un enlace interno y metadatos sociales OG/X.
 - `seo_title`, `og_title` y `twitter_title` se normalizan al formato `Título | Sitio` (configurable).
 - La portada aplica `brand kit` (prompt + color grading) para consistencia visual por marca.
+- Opcionalmente puede superponer un logo de marca (overlay sutil) cuando `BRAND_LOGO_ENABLED=1`.
 - Antes de publicar, se limpian enlaces rotos/inválidos y solo se conservan URLs verificadas.
 - La galería final de "Publicaciones Recientes" usa posts reales publicados en WordPress (no enlaces inventados).
 - Cada cierto número de publicaciones se añade un recurso externo recomendado en rotación (`PREFERRED_EXTERNAL_LINKS`).
