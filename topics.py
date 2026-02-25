@@ -51,14 +51,14 @@ def _normalize_topic(raw: dict) -> TopicProfile:
 def _default_topic() -> TopicProfile:
     return TopicProfile(
         topic_id="montessori_core",
-        name="Montessori Core",
+        name="Montessori Global",
         author_name="",
         queries=config.SEARCH_QUERIES,
         categories=["Educación Montessori"],
         min_score=config.MIN_USABILITY_SCORE,
         post_template="post_prompt.txt",
-        scoring_guidelines="Prioriza noticia verificable, aplicabilidad educativa y contexto México.",
-        writing_guidelines="Mantén enfoque práctico para familias y educadores de México.",
+        scoring_guidelines="Prioriza noticia verificable y aplicabilidad educativa en contexto internacional.",
+        writing_guidelines="Mantén enfoque práctico para familias y educadores de distintos países.",
     )
 
 

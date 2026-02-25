@@ -30,10 +30,10 @@ No se pudo extraer el texto completo de la fuente. Usa el fragmento y mantén af
 
 ## Requisitos del artículo
 1. El artículo debe ser ORIGINAL, no una copia de la fuente
-2. Escrito en español mexicano, tono profesional pero accesible
+2. Escrito en español claro (audiencia internacional), tono profesional pero accesible
 3. Mínimo 600 palabras
-4. Dirigido a padres de familia, educadores y directivos de escuelas Montessori en México
-5. Incluir perspectiva y contexto mexicano cuando sea relevante
+4. Dirigido a familias, educadores y directivos de escuelas Montessori a nivel internacional
+5. Incluir perspectiva internacional; agrega contexto regional solo cuando aporte claridad
 {% if source_public_url %}
 6. Al final, incluir una nota de atribución: "Fuente original: [título](url)"
 {% else %}

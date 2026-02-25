@@ -193,6 +193,7 @@ Ejemplo para correr todos los días a las 08:00:
 - El SEO gate local calcula `TruSEO-like` y `Headline score`; si no pasan umbral se marca `seo_failed` y no publica.
 - Se exige `title` corto (<=60), focus keyphrase en meta description, al menos un enlace interno y metadatos sociales OG/X.
 - Si la fuente no tiene URL pública válida (por ejemplo dominios `.local`), no se genera enlace roto en la atribución.
+- El enfoque editorial es internacional por defecto; se añade contexto local solo cuando realmente aporta.
 - El orden de publicación rota automáticamente por `topic_id` tomando como referencia el último borrador publicado.
 - Cuando se crea un borrador, el sistema puede enviar una notificación con título, autor, puntajes SEO y enlace directo de edición.
 

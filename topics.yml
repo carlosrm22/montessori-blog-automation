@@ -1,22 +1,22 @@
 topics:
   - id: montessori_core
-    name: Montessori México (Core)
+    name: Montessori Global (Core)
     author_name: Roxana Muñoz
     queries:
-      - "Montessori news"
-      - "Montessori México educación"
-      - "Montessori preschool study"
-      - "método Montessori novedades"
+      - "Montessori education research"
+      - "Montessori schools innovation"
+      - "método Montessori tendencias"
+      - "Montessori classroom practice"
     categories:
       - "Educación Montessori"
-      - "Montessori en México"
+      - "Montessori Internacional"
     min_score: 0.65
     post_template: post_prompt.txt
     scoring_guidelines: >
-      Prioriza evidencia reciente, estudios, prácticas aplicables y contexto para México.
+      Prioriza evidencia reciente, estudios y prácticas aplicables en distintos contextos culturales.
       Penaliza contenido comercial genérico y páginas institucionales sin novedad.
     writing_guidelines: >
-      Conecta hallazgos globales con aplicación concreta para familias y escuelas mexicanas.
+      Conecta hallazgos globales con aplicaciones prácticas para familias y escuelas de distintos países.
 
   - id: constructivismo
     name: Constructivismo y Aprendizaje Activo
@@ -54,4 +54,4 @@ topics:
       Prioriza evidencia sobre autonomía, clima de aula, motivación intrínseca y bienestar.
       Evita enfoques pseudocientíficos o afirmaciones sin sustento.
     writing_guidelines: >
-      Mantén tono práctico y riguroso, con recomendaciones aplicables en contexto escolar mexicano.
+      Mantén tono práctico y riguroso, con recomendaciones aplicables en contextos escolares internacionales.
