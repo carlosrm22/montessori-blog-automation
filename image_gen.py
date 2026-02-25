@@ -1,6 +1,5 @@
 """Genera imagen de portada usando Gemini 2.5 Flash image generation."""
 
-import base64
 import io
 import logging
 import time
@@ -14,8 +13,33 @@ import config
 logger = logging.getLogger(__name__)
 
 MODEL = config.GEMINI_IMAGE_MODEL
-TARGET_SIZE = (1200, 630)
-JPEG_QUALITY = 90
+TARGET_SIZE = (config.WP_IMAGE_WIDTH, config.WP_IMAGE_HEIGHT)
+JPEG_QUALITY = config.WP_IMAGE_QUALITY
+MAX_IMAGE_BYTES = config.WP_IMAGE_MAX_KB * 1024
+
+
+def _save_optimized_jpeg(img: Image.Image, output_path: Path) -> None:
+    """Save optimized JPEG, reducing quality to fit max target size when possible."""
+    quality = JPEG_QUALITY
+    while quality >= 60:
+        img.save(
+            output_path,
+            "JPEG",
+            quality=quality,
+            optimize=True,
+            progressive=True,
+        )
+        if output_path.stat().st_size <= MAX_IMAGE_BYTES:
+            return
+        quality -= 5
+    # Final fallback keeps best effort even if size is above target.
+    img.save(
+        output_path,
+        "JPEG",
+        quality=60,
+        optimize=True,
+        progressive=True,
+    )
 
 
 def generate_cover_image(
@@ -58,10 +82,13 @@ def generate_cover_image(
 
                     timestamp = int(time.time())
                     output_path = output_dir / f"cover_{timestamp}.jpg"
-                    img.save(output_path, "JPEG", quality=JPEG_QUALITY)
+                    _save_optimized_jpeg(img, output_path)
 
-                    logger.info("Cover image saved: %s (%dx%d)",
-                                output_path, *TARGET_SIZE)
+                    size_kb = output_path.stat().st_size / 1024
+                    logger.info(
+                        "Cover image saved: %s (%dx%d, %.1f KB)",
+                        output_path, *TARGET_SIZE, size_kb,
+                    )
                     return output_path
 
             logger.warning("Attempt %d: no image in response", attempt + 1)

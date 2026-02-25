@@ -57,7 +57,13 @@ def run_pipeline() -> bool:
     logger.info("=== Paso 5: Publicación en WordPress (borrador) ===")
     media_id = None
     if image_path:
-        media_id = upload_media(image_path, title=post.title)
+        media_id = upload_media(
+            image_path,
+            title=post.title,
+            alt_text=post.image_alt_text,
+            caption=post.excerpt or post.title,
+            description=post.seo_description or post.excerpt,
+        )
         if media_id is None:
             logger.warning("No se pudo subir la imagen, continuando sin imagen destacada")
 

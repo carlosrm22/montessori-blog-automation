@@ -49,6 +49,15 @@ def validate() -> None:
     if BRAVE_SEARCH_COUNT <= 0:
         logging.critical("BRAVE_SEARCH_COUNT debe ser mayor a 0")
         sys.exit(1)
+    if WP_IMAGE_WIDTH <= 0 or WP_IMAGE_HEIGHT <= 0:
+        logging.critical("WP_IMAGE_WIDTH y WP_IMAGE_HEIGHT deben ser mayores a 0")
+        sys.exit(1)
+    if WP_IMAGE_QUALITY <= 0 or WP_IMAGE_QUALITY > 100:
+        logging.critical("WP_IMAGE_QUALITY debe estar entre 1 y 100")
+        sys.exit(1)
+    if MIN_BODY_WORDS < 300:
+        logging.critical("MIN_BODY_WORDS debe ser al menos 300")
+        sys.exit(1)
 
 
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")
@@ -78,9 +87,19 @@ EXCLUDED_DOMAINS = [
 ]
 
 MIN_USABILITY_SCORE = float(os.environ.get("MIN_USABILITY_SCORE", "0.6"))
+MIN_BODY_WORDS = int(os.environ.get("MIN_BODY_WORDS", "600"))
 DRY_RUN = os.environ.get("DRY_RUN", "0") == "1"
 GEMINI_TEXT_MODEL = os.environ.get("GEMINI_TEXT_MODEL", "gemini-2.5-flash")
 GEMINI_IMAGE_MODEL = os.environ.get("GEMINI_IMAGE_MODEL", "gemini-2.5-flash-image")
+AIOSEO_SYNC = os.environ.get("AIOSEO_SYNC", "1") == "1"
+SEO_TITLE_MAX_LEN = int(os.environ.get("SEO_TITLE_MAX_LEN", "60"))
+SEO_DESCRIPTION_MAX_LEN = int(os.environ.get("SEO_DESCRIPTION_MAX_LEN", "155"))
+EXCERPT_MAX_LEN = int(os.environ.get("EXCERPT_MAX_LEN", "160"))
+MAX_TAGS = int(os.environ.get("MAX_TAGS", "10"))
+WP_IMAGE_WIDTH = int(os.environ.get("WP_IMAGE_WIDTH", "1200"))
+WP_IMAGE_HEIGHT = int(os.environ.get("WP_IMAGE_HEIGHT", "630"))
+WP_IMAGE_QUALITY = int(os.environ.get("WP_IMAGE_QUALITY", "90"))
+WP_IMAGE_MAX_KB = int(os.environ.get("WP_IMAGE_MAX_KB", "450"))
 DB_PATH = DATA_DIR / "blog_state.db"
 
 

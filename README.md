@@ -7,8 +7,8 @@ El flujo completo hace lo siguiente:
 1. Busca noticias recientes en web abierta con Brave Search API.
 2. Evalúa relevancia con Gemini.
 3. Genera un artículo original en HTML.
-4. Genera imagen de portada.
-5. Publica un borrador en WordPress (o simula en modo `DRY_RUN`).
+4. Genera imagen de portada optimizada para WordPress.
+5. Publica un borrador en WordPress y sincroniza metadata SEO para AIOSEO.
 6. Guarda estado en SQLite para no reprocesar URLs.
 
 ## Requisitos
@@ -55,9 +55,18 @@ Variables principales:
 - `WP_APP_PASSWORD`: Application Password de WordPress.
 - `SEARCH_QUERIES`: consultas separadas por coma.
 - `MIN_USABILITY_SCORE`: umbral mínimo para publicar.
+- `MIN_BODY_WORDS`: mínimo de palabras requeridas para el body (default `600`).
 - `DRY_RUN`: `1` para simular sin publicar; `0` para publicar borradores.
 - `GEMINI_TEXT_MODEL`: modelo para scoring y generación de texto (default `gemini-2.5-flash`).
 - `GEMINI_IMAGE_MODEL`: modelo para portada (default `gemini-2.5-flash-image`).
+- `AIOSEO_SYNC`: `1` para sincronizar title/description/OG/Twitter en AIOSEO.
+- `SEO_TITLE_MAX_LEN`: máximo de caracteres para SEO title (default `60`).
+- `SEO_DESCRIPTION_MAX_LEN`: máximo de caracteres para meta description (default `155`).
+- `EXCERPT_MAX_LEN`: máximo de caracteres para excerpt (default `160`).
+- `MAX_TAGS`: máximo de tags por post (default `10`).
+- `WP_IMAGE_WIDTH` / `WP_IMAGE_HEIGHT`: dimensiones objetivo de portada.
+- `WP_IMAGE_QUALITY`: calidad JPEG inicial (1-100).
+- `WP_IMAGE_MAX_KB`: peso objetivo máximo de imagen.
 
 ## Ejecución
 
@@ -124,6 +133,8 @@ Ejemplo para correr cada día a las 08:00:
 - Si falla generación o publicación, registra estado (`gen_failed`, `wp_failed`, etc.).
 - Categorías y tags en WordPress se resuelven/crean automáticamente.
 - Los resultados de `EXCLUDED_DOMAINS` se filtran para evitar auto-referencias del propio sitio.
+- Se actualizan `alt_text`, `caption` y `description` de la imagen destacada para accesibilidad.
+- El scoring penaliza páginas evergreen (home/about/wiki) y prioriza contenido más noticioso/reciente.
 
 ## Licencia
 
