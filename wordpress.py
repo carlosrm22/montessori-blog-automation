@@ -1,11 +1,16 @@
 """Cliente REST API de WordPress: sube media y crea borradores."""
 
+import base64
+import hashlib
 import logging
 import re
+import random
 import time
 import unicodedata
 from html import unescape
 from pathlib import Path
+from urllib.parse import urljoin
+from urllib.parse import quote, urlparse
 
 import httpx
 
@@ -14,6 +19,108 @@ from content import GeneratedPost
 
 logger = logging.getLogger(__name__)
 _AUTHOR_CACHE: dict[str, int] = {}
+_SG_REFRESH_RE = re.compile(r'content="0;([^"]+)"', re.IGNORECASE)
+_SG_CHALLENGE_RE = re.compile(r'const sgchallenge="([^"]+)";')
+_SG_SUBMIT_RE = re.compile(r'const sgsubmit_url="([^"]+)";')
+
+
+def _int_to_min_be(value: int) -> bytes:
+    if value <= 0xFF:
+        return bytes([value])
+    if value <= 0xFFFF:
+        return value.to_bytes(2, "big")
+    if value <= 0xFFFFFF:
+        return value.to_bytes(3, "big")
+    return value.to_bytes(4, "big")
+
+
+def _solve_sgchallenge(challenge: str, start: int, max_iters: int = 8_000_000) -> tuple[str, int, float] | None:
+    """Solve SiteGuard PoW challenge and return solution, hashes, elapsed seconds."""
+    try:
+        complexity = int(challenge.split(":", 1)[0])
+    except Exception:
+        return None
+    if complexity <= 0 or complexity > 31:
+        return None
+
+    challenge_bytes = challenge.encode("utf-8")
+    shift = 32 - complexity
+    t0 = time.time()
+
+    for idx in range(max_iters):
+        counter = start + idx
+        payload = challenge_bytes + _int_to_min_be(counter)
+        digest = hashlib.sha1(payload).digest()
+        if (int.from_bytes(digest[:4], "big") >> shift) == 0:
+            solution = base64.b64encode(payload).decode("ascii")
+            return solution, idx + 1, max(time.time() - t0, 0.001)
+    return None
+
+
+def _is_sgcaptcha_html(resp: httpx.Response) -> bool:
+    ctype = (resp.headers.get("content-type") or "").lower()
+    if resp.status_code != 202:
+        return False
+    if "text/html" not in ctype:
+        return False
+    text = (resp.text or "").lower()
+    return ".well-known/sgcaptcha" in text or "robot challenge screen" in text
+
+
+def _try_solve_sgcaptcha(client: httpx.Client, endpoint_url: str, resp: httpx.Response) -> bool:
+    """Attempt to solve SiteGuard challenge in-band for this client session."""
+    refresh_match = _SG_REFRESH_RE.search(resp.text or "")
+    if not refresh_match:
+        return False
+    refresh_url = urljoin(config.WP_SITE_URL + "/", unescape(refresh_match.group(1)))
+
+    try:
+        challenge_resp = client.get(refresh_url)
+    except Exception:
+        return False
+    if challenge_resp.status_code >= 400:
+        parsed = urlparse(endpoint_url)
+        path_query = parsed.path
+        if parsed.query:
+            path_query = f"{path_query}?{parsed.query}"
+        fallback_refresh = urljoin(
+            config.WP_SITE_URL + "/",
+            f"/.well-known/sgcaptcha/?r={quote(path_query, safe='')}",
+        )
+        try:
+            challenge_resp = client.get(fallback_refresh)
+        except Exception:
+            return False
+        if challenge_resp.status_code >= 400:
+            logger.warning("No se pudo abrir challenge sgcaptcha para %s", endpoint_url)
+            return False
+    challenge_html = challenge_resp.text or ""
+    challenge_match = _SG_CHALLENGE_RE.search(challenge_html)
+    submit_match = _SG_SUBMIT_RE.search(challenge_html)
+    if not challenge_match or not submit_match:
+        return False
+
+    challenge = challenge_match.group(1)
+    submit_url = urljoin(config.WP_SITE_URL + "/", unescape(submit_match.group(1)))
+    start_from = random.randint(0, 40_000_000)
+    solved = _solve_sgchallenge(challenge, start=start_from)
+    if not solved:
+        logger.warning("No se pudo resolver sgcaptcha para %s", endpoint_url)
+        return False
+    solution, hashes, elapsed = solved
+    sep = "&" if "?" in submit_url else "?"
+    token_url = f"{submit_url}{sep}sol={solution}&s={int(elapsed * 1000)}:{hashes}"
+    try:
+        client.get(token_url)
+    except Exception:
+        return False
+
+    verify = client.get(endpoint_url)
+    if _is_sgcaptcha_html(verify):
+        logger.warning("sgcaptcha persistió para %s", endpoint_url)
+        return False
+    logger.info("sgcaptcha resuelto para %s (hashes=%d)", endpoint_url, hashes)
+    return True
 
 
 def _auth() -> tuple[str, str]:
@@ -56,6 +163,13 @@ def _request(
     with httpx.Client(timeout=60, auth=_auth()) as client:
         try:
             resp = getattr(client, method)(url, **kwargs)
+            if _is_sgcaptcha_html(resp):
+                solved = _try_solve_sgcaptcha(client, url, resp)
+                if solved:
+                    resp = getattr(client, method)(url, **kwargs)
+            if _is_sgcaptcha_html(resp):
+                logger.error("WordPress blocked by sgcaptcha: %s %s", method.upper(), url)
+                return None
             if resp.status_code == 401:
                 logger.error("WordPress auth failed (401). Check credentials.")
                 return None
