@@ -15,10 +15,8 @@ TEMPLATES_DIR = BASE_DIR / "templates"
 
 load_dotenv(BASE_DIR / ".env")
 
-REQUIRED_VARS = [
+BASE_REQUIRED_VARS = [
     "GEMINI_API_KEY",
-    "GOOGLE_CSE_KEY",
-    "GOOGLE_CSE_CX",
     "WP_SITE_URL",
     "WP_USERNAME",
     "WP_APP_PASSWORD",
@@ -35,11 +33,24 @@ def _get_required(name: str) -> str:
 
 def validate() -> None:
     """Valida que todas las variables requeridas estén definidas."""
-    for var in REQUIRED_VARS:
+    for var in BASE_REQUIRED_VARS:
         _get_required(var)
+    if SEARCH_PROVIDER == "brave":
+        _get_required("BRAVE_SEARCH_API_KEY")
+    elif SEARCH_PROVIDER == "google_cse":
+        _get_required("GOOGLE_CSE_KEY")
+        _get_required("GOOGLE_CSE_CX")
+    else:
+        logging.critical(
+            "SEARCH_PROVIDER inválido: %s. Valores válidos: brave, google_cse",
+            SEARCH_PROVIDER,
+        )
+        sys.exit(1)
 
 
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")
+SEARCH_PROVIDER = os.environ.get("SEARCH_PROVIDER", "brave").strip().lower()
+BRAVE_SEARCH_API_KEY = os.environ.get("BRAVE_SEARCH_API_KEY", "")
 GOOGLE_CSE_KEY = os.environ.get("GOOGLE_CSE_KEY", "")
 GOOGLE_CSE_CX = os.environ.get("GOOGLE_CSE_CX", "")
 WP_SITE_URL = os.environ.get("WP_SITE_URL", "").rstrip("/")

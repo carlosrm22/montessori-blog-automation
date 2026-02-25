@@ -4,7 +4,7 @@ Pipeline en Python para automatizar la curación y generación de borradores par
 
 El flujo completo hace lo siguiente:
 
-1. Busca noticias recientes con Google Custom Search.
+1. Busca noticias recientes en web abierta con Brave Search API.
 2. Evalúa relevancia con Gemini.
 3. Genera un artículo original en HTML.
 4. Genera imagen de portada.
@@ -15,7 +15,7 @@ El flujo completo hace lo siguiente:
 
 - Python 3.10+
 - Cuenta/API para:
-  - Google Custom Search JSON API
+  - Brave Search API
   - Gemini API (`google-genai`)
   - WordPress con Application Password
 
@@ -43,8 +43,9 @@ cp .env.example .env
 Variables principales:
 
 - `GEMINI_API_KEY`: API key de Gemini.
-- `GOOGLE_CSE_KEY`: API key de Google Custom Search.
-- `GOOGLE_CSE_CX`: ID del buscador personalizado.
+- `SEARCH_PROVIDER`: proveedor de búsqueda (`brave` por defecto, `google_cse` opcional).
+- `BRAVE_SEARCH_API_KEY`: API key de Brave Search.
+- `GOOGLE_CSE_KEY` y `GOOGLE_CSE_CX`: opcionales, solo si usas `SEARCH_PROVIDER=google_cse`.
 - `WP_SITE_URL`: URL base de WordPress (sin slash final).
 - `WP_USERNAME`: usuario de WordPress.
 - `WP_APP_PASSWORD`: Application Password de WordPress.
@@ -92,7 +93,7 @@ Ejemplo para correr cada día a las 08:00:
 ```text
 .
 ├── main.py          # Orquestador del pipeline
-├── search.py        # Búsqueda de noticias (Google CSE)
+├── search.py        # Búsqueda de noticias (Brave / Google CSE)
 ├── scorer.py        # Scoring de relevancia con Gemini
 ├── content.py       # Generación de artículo en HTML
 ├── image_gen.py     # Generación de portada con Gemini
