@@ -65,6 +65,9 @@ def validate() -> None:
     if TOPICS_MAX_POSTS_PER_RUN <= 0:
         logging.critical("TOPICS_MAX_POSTS_PER_RUN debe ser mayor a 0")
         sys.exit(1)
+    if PUBLISH_INTERVAL_DAYS < 0:
+        logging.critical("PUBLISH_INTERVAL_DAYS no puede ser negativo")
+        sys.exit(1)
 
 
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")
@@ -147,6 +150,7 @@ TOPIC_IDS = [
     if t.strip()
 ]
 TOPICS_MAX_POSTS_PER_RUN = int(os.environ.get("TOPICS_MAX_POSTS_PER_RUN", "1"))
+PUBLISH_INTERVAL_DAYS = int(os.environ.get("PUBLISH_INTERVAL_DAYS", "15"))
 DB_PATH = DATA_DIR / "blog_state.db"
 
 

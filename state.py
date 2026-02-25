@@ -99,6 +99,47 @@ def get_all_processed_urls(topic_id: str = "default") -> set[str]:
         return {row[0] for row in rows}
 
 
+def _parse_created_at(value: str) -> datetime | None:
+    raw = (value or "").strip()
+    if not raw:
+        return None
+    try:
+        dt = datetime.fromisoformat(raw.replace("Z", "+00:00"))
+    except ValueError:
+        try:
+            dt = datetime.strptime(raw, "%Y-%m-%d %H:%M:%S")
+        except ValueError:
+            return None
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=timezone.utc)
+    return dt.astimezone(timezone.utc)
+
+
+def get_last_published_at(
+    statuses: tuple[str, ...] = ("published_draft",),
+    topic_id: str | None = None,
+) -> datetime | None:
+    if not statuses:
+        return None
+    placeholders = ",".join("?" for _ in statuses)
+    sql = (
+        "SELECT created_at FROM processed_articles "
+        f"WHERE status IN ({placeholders})"
+    )
+    params: list[str] = list(statuses)
+    if topic_id:
+        sql += " AND topic_id = ?"
+        params.append(topic_id)
+    sql += " ORDER BY created_at DESC LIMIT 1"
+
+    with _connect() as conn:
+        _migrate_if_needed(conn)
+        row = conn.execute(sql, params).fetchone()
+    if not row:
+        return None
+    return _parse_created_at(str(row[0]))
+
+
 if __name__ == "__main__":
     config.setup_logging()
     mark_processed("https://example.com/test", title="Test", score=0.8)

@@ -61,6 +61,7 @@ Variables principales:
 - `SEARCH_QUERIES`: fallback de consultas separadas por coma (solo si falta `topics.yml`).
 - `TOPIC_IDS`: lista separada por coma para correr solo ciertos temas (ej. `montessori_core,constructivismo`).
 - `TOPICS_MAX_POSTS_PER_RUN`: máximo de borradores por corrida.
+- `PUBLISH_INTERVAL_DAYS`: días mínimos entre publicaciones globales (default `15`, `0` = desactivar).
 - `MIN_USABILITY_SCORE`: umbral mínimo para publicar.
 - `MIN_BODY_WORDS`: mínimo de palabras requeridas para el body (default `600`).
 - `DRY_RUN`: `1` para simular sin publicar; `0` para publicar borradores.
@@ -117,7 +118,10 @@ En este modo no publica en WordPress, pero sí ejecuta búsqueda, evaluación, g
 
 ## Programación automática (cron)
 
-Ejemplo para correr cada día a las 08:00:
+Recomendación: correr diario y dejar que el candado de cadencia (`PUBLISH_INTERVAL_DAYS`) decida si toca publicar.
+Con `PUBLISH_INTERVAL_DAYS=15`, publicará aproximadamente cada 15 días sin intervención humana.
+
+Ejemplo para correr todos los días a las 08:00:
 
 ```cron
 0 8 * * * cd /home/carlos/montessori-blog-automation && /home/carlos/montessori-blog-automation/run.sh

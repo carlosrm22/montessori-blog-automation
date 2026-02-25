@@ -2,6 +2,7 @@
 
 import logging
 import sys
+from datetime import datetime, timedelta, timezone
 
 import config
 import state
@@ -14,6 +15,32 @@ from source_fetch import enrich_article
 from topics import TopicProfile, load_topics
 
 logger = logging.getLogger(__name__)
+
+
+def _is_publish_due() -> bool:
+    if config.PUBLISH_INTERVAL_DAYS == 0:
+        return True
+
+    last_published = state.get_last_published_at(statuses=("published_draft",))
+    if last_published is None:
+        return True
+
+    next_allowed = last_published + timedelta(days=config.PUBLISH_INTERVAL_DAYS)
+    now = datetime.now(timezone.utc)
+    if now < next_allowed:
+        wait = next_allowed - now
+        remaining_days = round(wait.total_seconds() / 86400, 1)
+        logger.info(
+            (
+                "Cadencia activa: último draft el %s UTC. "
+                "Próxima publicación permitida el %s UTC (faltan ~%.1f días)."
+            ),
+            last_published.isoformat(timespec="seconds"),
+            next_allowed.isoformat(timespec="seconds"),
+            remaining_days,
+        )
+        return False
+    return True
 
 
 def run_topic_pipeline(topic: TopicProfile) -> bool:
@@ -111,6 +138,10 @@ def run_topic_pipeline(topic: TopicProfile) -> bool:
 
 def run_pipeline() -> bool:
     """Execute topic-driven pipeline. Returns True if any post was created."""
+    if not _is_publish_due():
+        logger.info("No toca publicar en esta corrida.")
+        return False
+
     topics = load_topics(config.TOPICS_FILE, only_ids=config.TOPIC_IDS)
     logger.info("Topics cargados: %s", [t.topic_id for t in topics])
     created = 0
