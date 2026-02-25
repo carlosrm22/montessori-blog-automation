@@ -32,8 +32,12 @@ class GeneratedPost:
 def _render_prompt(article: SearchResult) -> str:
     env = Environment(loader=FileSystemLoader(config.TEMPLATES_DIR))
     template = env.get_template("post_prompt.txt")
+    blocked_terms = ", ".join(config.BLOCKED_MENTION_TERMS)
     return template.render(
-        title=article.title, url=article.url, snippet=article.snippet
+        title=article.title,
+        url=article.url,
+        snippet=article.snippet,
+        blocked_terms=blocked_terms,
     )
 
 
@@ -96,6 +100,40 @@ def _contains_keyphrase(title: str, keyphrase: str) -> bool:
     phrase_tokens = set(phrase_n.split())
     title_tokens = set(title_n.split())
     return bool(phrase_tokens) and phrase_tokens.issubset(title_tokens)
+
+
+def _find_blocked_term(text: str) -> str | None:
+    haystack = _normalize_for_compare(text)
+    tokens = set(haystack.split())
+    for term in config.BLOCKED_MENTION_TERMS:
+        needle = _normalize_for_compare(term)
+        if not needle:
+            continue
+        if len(needle) <= 3 and " " not in needle:
+            if needle in tokens:
+                return term
+            continue
+        if needle in haystack:
+            return term
+    return None
+
+
+def _contains_blocked_mentions(post: GeneratedPost) -> str | None:
+    candidates = [
+        post.title,
+        post.body,
+        post.excerpt,
+        post.seo_title,
+        post.seo_description,
+        post.focus_keyphrase,
+        post.image_alt_text,
+        " ".join(post.tags),
+    ]
+    for text in candidates:
+        blocked = _find_blocked_term(text)
+        if blocked:
+            return blocked
+    return None
 
 
 def _extract_focus_keyphrase(data: dict, title: str, tags: list[str]) -> str:
@@ -193,6 +231,15 @@ def generate_post(article: SearchResult, max_retries: int = 2) -> GeneratedPost 
                 return None
 
             post = _normalize_generated_post(data)
+            blocked = _contains_blocked_mentions(post)
+            if blocked:
+                logger.warning(
+                    "Attempt %d: post contains blocked term '%s', retrying/aborting",
+                    attempt + 1, blocked,
+                )
+                if attempt < max_retries - 1:
+                    continue
+                return None
             logger.info(
                 "Artículo generado: '%s' (%d palabras)", post.title, word_count
             )

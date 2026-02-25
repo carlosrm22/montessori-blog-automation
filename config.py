@@ -82,8 +82,39 @@ SEARCH_QUERIES = [
 ]
 EXCLUDED_DOMAINS = [
     d.strip().lower()
-    for d in os.environ.get("EXCLUDED_DOMAINS", "montessorimexico.org").split(",")
+    for d in os.environ.get(
+        "EXCLUDED_DOMAINS",
+        "montessorimexico.org,montessori-ami.org,amiusa.org",
+    ).split(",")
     if d.strip()
+]
+BLOCKED_SOURCE_TERMS = [
+    t.strip().lower()
+    for t in os.environ.get(
+        "BLOCKED_SOURCE_TERMS",
+        (
+            "ami,amimontessori,misdami,ami_montessori,"
+            "association montessori internationale,"
+            "asociacion montessori internacional,"
+            "ami/usa,ami usa,ami-eaa,ami mexico,"
+            "asociacion montessori de mexico"
+        ),
+    ).split(",")
+    if t.strip()
+]
+BLOCKED_MENTION_TERMS = [
+    t.strip().lower()
+    for t in os.environ.get(
+        "BLOCKED_MENTION_TERMS",
+        (
+            "ami,amimontessori,misdami,ami_montessori,"
+            "association montessori internationale,"
+            "asociacion montessori internacional,"
+            "ami/usa,ami usa,ami-eaa,ami mexico,"
+            "asociacion montessori de mexico"
+        ),
+    ).split(",")
+    if t.strip()
 ]
 
 MIN_USABILITY_SCORE = float(os.environ.get("MIN_USABILITY_SCORE", "0.6"))

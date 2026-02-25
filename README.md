@@ -49,6 +49,8 @@ Variables principales:
 - `BRAVE_SEARCH_COUNTRY`: país para Brave (vacío = sin restricción geográfica).
 - `BRAVE_SEARCH_LANG`: idioma para Brave (vacío = cualquier idioma).
 - `EXCLUDED_DOMAINS`: dominios a excluir de resultados (default `montessorimexico.org`).
+- `BLOCKED_SOURCE_TERMS`: términos para descartar fuentes no deseadas (default incluye AMI/AMI México y variantes).
+- `BLOCKED_MENTION_TERMS`: términos prohibidos dentro del contenido generado (default incluye AMI/AMI México y variantes).
 - `GOOGLE_CSE_KEY` y `GOOGLE_CSE_CX`: opcionales, solo si usas `SEARCH_PROVIDER=google_cse`.
 - `WP_SITE_URL`: URL base de WordPress (sin slash final).
 - `WP_USERNAME`: usuario de WordPress.
@@ -133,6 +135,8 @@ Ejemplo para correr cada día a las 08:00:
 - Si falla generación o publicación, registra estado (`gen_failed`, `wp_failed`, etc.).
 - Categorías y tags en WordPress se resuelven/crean automáticamente.
 - Los resultados de `EXCLUDED_DOMAINS` se filtran para evitar auto-referencias del propio sitio.
+- `BLOCKED_SOURCE_TERMS` descarta fuentes AMI/AMI México (u otras que definas).
+- `BLOCKED_MENTION_TERMS` evita que el texto final mencione AMI/AMI México.
 - Se actualizan `alt_text`, `caption` y `description` de la imagen destacada para accesibilidad.
 - El scoring penaliza páginas evergreen (home/about/wiki) y prioriza contenido más noticioso/reciente.
 

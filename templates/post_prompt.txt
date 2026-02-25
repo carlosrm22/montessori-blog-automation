@@ -16,6 +16,7 @@ A partir de la siguiente noticia/fuente, genera un artículo ORIGINAL para el bl
 6. Al final, incluir una nota de atribución: "Fuente original: [título](url)"
 7. No usar etiqueta <h1> en el body (WordPress usará el título del post como H1)
 8. Incluir al menos 3 subtítulos <h2>, y cuando aplique usar <h3>, listas <ul>/<li>
+9. NO mencionar AMI ni AMI México ni sus variantes; evita estas referencias explícitas: {{ blocked_terms }}
 
 ## Reglas SEO (AIOSEO)
 1. Definir una `focus_keyphrase` clara (2 a 5 palabras)
