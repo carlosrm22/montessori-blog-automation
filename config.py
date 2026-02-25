@@ -224,6 +224,7 @@ BRAND_KITS_FILE = (
     if _brand_kits_path.is_absolute()
     else (BASE_DIR / _brand_kits_path).resolve()
 )
+BRAND_LOGO_ENABLED = os.environ.get("BRAND_LOGO_ENABLED", "0") == "1"
 WP_IMAGE_WIDTH = int(os.environ.get("WP_IMAGE_WIDTH", "1200"))
 WP_IMAGE_HEIGHT = int(os.environ.get("WP_IMAGE_HEIGHT", "630"))
 WP_IMAGE_QUALITY = int(os.environ.get("WP_IMAGE_QUALITY", "90"))

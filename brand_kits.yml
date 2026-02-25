@@ -17,6 +17,13 @@ brands:
       tint_opacity: 0.08
       contrast: 1.05
       saturation: 1.05
+    logo:
+      enabled: true
+      path: "assets/logos/kalpilli.webp"
+      position: "bottom_right"
+      scale: 0.16
+      opacity: 0.17
+      margin_px: 24
 
   ammac:
     display_name: "AMMAC"
@@ -36,3 +43,10 @@ brands:
       tint_opacity: 0.07
       contrast: 1.06
       saturation: 0.95
+    logo:
+      enabled: true
+      path: "assets/logos/ammac.webp"
+      position: "bottom_right"
+      scale: 0.14
+      opacity: 0.16
+      margin_px: 24
