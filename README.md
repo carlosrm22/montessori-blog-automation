@@ -86,6 +86,8 @@ Variables principales:
 - `MAX_TAGS`: máximo de tags por post (default `10`).
 - `SITE_TITLE`: nombre del sitio para títulos SEO/social (ej. `Asociación Montessori de México`).
 - `TITLE_SEPARATOR`: separador entre título de entrada y nombre del sitio (ej. `|`).
+- `BRAND_KIT`: kit visual global para portadas (`ammac` o `kalpilli`).
+- `BRAND_KITS_FILE`: ruta al archivo YAML de brand kits (default `brand_kits.yml`).
 - `INTERNAL_LINKS`: fallback de enlaces internos reales (se usa solo si no hay enlaces internos válidos tras limpiar el contenido).
 - `LINK_VALIDATION_ENABLED`: valida enlaces HTTP antes de publicar (`1` por defecto).
 - `LINK_CHECK_TIMEOUT`: timeout (segundos) para validar cada URL (default `8`).
@@ -104,12 +106,20 @@ El archivo [`topics.yml`](/home/carlos/montessori-blog-automation/topics.yml) de
 
 - `id`, `name`
 - `author_name` (nombre del autor en WordPress para ese tema)
+- `brand_kit` (opcional por tema; fallback a `BRAND_KIT`)
 - `queries`
 - `categories`
 - `min_score`
 - `post_template`
 - `scoring_guidelines`
 - `writing_guidelines`
+
+El archivo [`brand_kits.yml`](/home/carlos/montessori-blog-automation/brand_kits.yml) define estilo visual por marca:
+
+- `prompt_prefix`
+- `palette`
+- `negative`
+- `postprocess` (tinte, contraste, saturación)
 
 ## Ejecución
 
@@ -167,6 +177,7 @@ Ejemplo para correr todos los días a las 08:00:
 ├── content.py       # Generación de artículo en HTML
 ├── source_fetch.py  # Fetch + extracción de contenido de la fuente
 ├── image_gen.py     # Generación de portada con Gemini
+├── branding.py      # Brand kits (prompt wrapper + postproceso visual)
 ├── wordpress.py     # Publicación de borradores vía WP REST API
 ├── notifier.py      # Envío de alertas al crear borradores
 ├── state.py         # Persistencia SQLite de URLs procesadas
@@ -174,6 +185,7 @@ Ejemplo para correr todos los días a las 08:00:
 ├── templates/
 │   └── post_prompt.txt
 ├── topics.yml        # Configuración editorial por vertical
+├── brand_kits.yml    # Configuración visual de marca para portadas
 ├── data/
 │   ├── blog_state.db
 │   └── images/
@@ -200,6 +212,7 @@ Ejemplo para correr todos los días a las 08:00:
 - El SEO gate local calcula `TruSEO-like` y `Headline score`; si no pasan umbral se marca `seo_failed` y no publica.
 - Se exige `title` corto (<=60), focus keyphrase en meta description, al menos un enlace interno y metadatos sociales OG/X.
 - `seo_title`, `og_title` y `twitter_title` se normalizan al formato `Título | Sitio` (configurable).
+- La portada aplica `brand kit` (prompt + color grading) para consistencia visual por marca.
 - Antes de publicar, se limpian enlaces rotos/inválidos y solo se conservan URLs verificadas.
 - La galería final de "Publicaciones Recientes" usa posts reales publicados en WordPress (no enlaces inventados).
 - Cada cierto número de publicaciones se añade un recurso externo recomendado en rotación (`PREFERRED_EXTERNAL_LINKS`).

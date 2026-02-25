@@ -219,7 +219,7 @@ def run_topic_pipeline(topic: TopicProfile) -> bool:
 
     # 4. Generate cover image
     logger.info("=== Paso 4: Generación de imagen de portada ===")
-    image_path = generate_cover_image(post.image_prompt)
+    image_path = generate_cover_image(post.image_prompt, brand_id=topic.brand_kit)
 
     # 5. Publish to WordPress
     if config.DRY_RUN:

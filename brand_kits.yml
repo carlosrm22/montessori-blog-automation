@@ -1,0 +1,38 @@
+brands:
+  kalpilli:
+    display_name: "Kalpilli"
+    palette:
+      primary: "#CE976B"
+      background: "#ECE2DD"
+      accents: ["#E8CAB3", "#9D6F55", "#4C6970"]
+    prompt_prefix: >
+      Professional editorial documentary photography for an educational blog header.
+      Warm natural daylight, natural wood Montessori materials, plants, calm human atmosphere.
+      Clean composition, realistic scene, shallow depth of field, soft film look.
+    negative: >
+      embedded text, typography, watermark, logo, brand names, signage,
+      low quality, distorted hands, extra fingers
+    postprocess:
+      tint_hex: "#CE976B"
+      tint_opacity: 0.08
+      contrast: 1.05
+      saturation: 1.05
+
+  ammac:
+    display_name: "AMMAC"
+    palette:
+      primary: "#4E6971"
+      background: "#FFFFFF"
+      accents: ["#CECECE", "#9EA1A1", "#016DB3"]
+    prompt_prefix: >
+      Clean minimalist editorial photography for an educational association blog header.
+      Cool neutral lighting, uncluttered background, modern academic mood, subtle geometric shapes.
+      High realism, professional, calm and credible.
+    negative: >
+      embedded text, typography, watermark, logo, brand names, signage,
+      cluttered background, low quality
+    postprocess:
+      tint_hex: "#4E6971"
+      tint_opacity: 0.07
+      contrast: 1.06
+      saturation: 0.95

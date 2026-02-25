@@ -7,6 +7,7 @@ from pathlib import Path
 from urllib.parse import urlparse
 
 from dotenv import load_dotenv
+import yaml
 
 BASE_DIR = Path(__file__).resolve().parent
 DATA_DIR = BASE_DIR / "data"
@@ -110,6 +111,26 @@ def validate() -> None:
     if not TITLE_SEPARATOR.strip():
         logging.critical("TITLE_SEPARATOR no puede estar vacío")
         sys.exit(1)
+    if not BRAND_KITS_FILE.exists():
+        logging.critical("BRAND_KITS_FILE no existe: %s", BRAND_KITS_FILE)
+        sys.exit(1)
+    try:
+        raw = yaml.safe_load(BRAND_KITS_FILE.read_text(encoding="utf-8")) or {}
+    except Exception:
+        logging.critical("No se pudo leer BRAND_KITS_FILE: %s", BRAND_KITS_FILE)
+        sys.exit(1)
+    brands = raw.get("brands", {})
+    if not isinstance(brands, dict) or not brands:
+        logging.critical("BRAND_KITS_FILE debe incluir un mapa no vacío en 'brands'")
+        sys.exit(1)
+    if BRAND_KIT not in brands:
+        logging.critical(
+            "BRAND_KIT '%s' no existe en %s. Disponibles: %s",
+            BRAND_KIT,
+            BRAND_KITS_FILE,
+            ", ".join(sorted(brands.keys())),
+        )
+        sys.exit(1)
 
 
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")
@@ -194,6 +215,15 @@ EXCERPT_MAX_LEN = int(os.environ.get("EXCERPT_MAX_LEN", "160"))
 MAX_TAGS = int(os.environ.get("MAX_TAGS", "10"))
 SITE_TITLE = os.environ.get("SITE_TITLE", "Asociación Montessori de México").strip()
 TITLE_SEPARATOR = os.environ.get("TITLE_SEPARATOR", "|").strip()
+BRAND_KIT = os.environ.get("BRAND_KIT", "ammac").strip().lower()
+_brand_kits_path = Path(
+    os.environ.get("BRAND_KITS_FILE", str(BASE_DIR / "brand_kits.yml"))
+).expanduser()
+BRAND_KITS_FILE = (
+    _brand_kits_path
+    if _brand_kits_path.is_absolute()
+    else (BASE_DIR / _brand_kits_path).resolve()
+)
 WP_IMAGE_WIDTH = int(os.environ.get("WP_IMAGE_WIDTH", "1200"))
 WP_IMAGE_HEIGHT = int(os.environ.get("WP_IMAGE_HEIGHT", "630"))
 WP_IMAGE_QUALITY = int(os.environ.get("WP_IMAGE_QUALITY", "90"))

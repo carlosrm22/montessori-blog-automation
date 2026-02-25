@@ -8,6 +8,7 @@ from pathlib import Path
 from google import genai
 from PIL import Image, ImageOps
 
+import branding
 import config
 
 logger = logging.getLogger(__name__)
@@ -50,7 +51,10 @@ def _save_optimized_jpeg(img: Image.Image, output_path: Path) -> None:
 
 
 def generate_cover_image(
-    prompt: str, output_dir: Path | None = None, max_retries: int = 3
+    prompt: str,
+    output_dir: Path | None = None,
+    max_retries: int = 3,
+    brand_id: str | None = None,
 ) -> Path | None:
     """Generate a cover image and save as optimized JPEG. Returns path or None."""
     if not prompt:
@@ -59,12 +63,12 @@ def generate_cover_image(
 
     output_dir = output_dir or config.IMAGES_DIR
     output_dir.mkdir(parents=True, exist_ok=True)
-
-    full_prompt = (
-        f"{prompt} "
-        "Style: professional editorial photography, warm lighting, "
-        "clean composition, suitable for a blog header. "
-        "No text overlay. High quality. Wide 1.91:1 aspect ratio (1200x630)."
+    kit = branding.load_brand_kit(brand_id=brand_id)
+    full_prompt = branding.build_cover_prompt(
+        subject_prompt=prompt,
+        kit=kit,
+        width=TARGET_SIZE[0],
+        height=TARGET_SIZE[1],
     )
 
     client = genai.Client(api_key=config.GEMINI_API_KEY)
@@ -86,6 +90,7 @@ def generate_cover_image(
                     source_img = Image.open(io.BytesIO(image_bytes))
                     source_size = source_img.size
                     img = _prepare_cover_image(source_img)
+                    img = branding.apply_brand_look(img, kit)
 
                     timestamp = int(time.time())
                     output_path = output_dir / f"cover_{timestamp}.jpg"
@@ -93,8 +98,13 @@ def generate_cover_image(
 
                     size_kb = output_path.stat().st_size / 1024
                     logger.info(
-                        "Cover image saved: %s (source=%dx%d -> %dx%d, %.1f KB)",
-                        output_path, source_size[0], source_size[1], *TARGET_SIZE, size_kb,
+                        "Cover image saved: %s (brand=%s, source=%dx%d -> %dx%d, %.1f KB)",
+                        output_path,
+                        kit.brand_id,
+                        source_size[0],
+                        source_size[1],
+                        *TARGET_SIZE,
+                        size_kb,
                     )
                     return output_path
 
