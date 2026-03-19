@@ -1,0 +1,14 @@
+[Unit]
+Description=Montessori Blog Automation Pipeline
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/home/carlos/montessori-blog-automation/run.sh
+WorkingDirectory=/home/carlos/montessori-blog-automation
+TimeoutStartSec=1800
+Environment=HOME=/home/carlos
+
+[Install]
+WantedBy=default.target

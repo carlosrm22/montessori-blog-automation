@@ -156,16 +156,35 @@ DRY_RUN=1 ./run.sh
 
 En este modo no publica en WordPress, pero sí ejecuta búsqueda, evaluación, generación y registro de estado.
 
-## Programación automática (cron)
+## Programación automática (systemd)
 
 Recomendación: correr diario y dejar que el candado de cadencia (`PUBLISH_INTERVAL_DAYS`) decida si toca publicar.
 Con `PUBLISH_INTERVAL_DAYS=7`, publicará aproximadamente cada semana sin intervención humana.
 
-Ejemplo para correr todos los días a las 08:00:
+El repositorio incluye units listos para `systemd --user` en `systemd/montessori-blog.service` y `systemd/montessori-blog.timer`.
 
-```cron
-0 8 * * * cd /home/carlos/montessori-blog-automation && /home/carlos/montessori-blog-automation/run.sh
+Instalación recomendada:
+
+```bash
+mkdir -p ~/.config/systemd/user
+cp systemd/montessori-blog.service ~/.config/systemd/user/
+cp systemd/montessori-blog.timer ~/.config/systemd/user/
+systemctl --user daemon-reload
+systemctl --user enable --now montessori-blog.timer
+loginctl enable-linger "$USER"
 ```
+
+Verificación:
+
+```bash
+systemctl --user status montessori-blog.timer
+systemctl --user list-timers --all | grep montessori-blog
+journalctl --user -u montessori-blog.service -n 50 --no-pager
+```
+
+La programación queda diaria a las `08:00` y `Persistent=true` hace que, si la máquina estaba apagada o hibernada a esa hora, la corrida pendiente se ejecute al reanudar o iniciar sesión.
+
+`cron` puede seguir funcionando como alternativa, pero no recupera ejecuciones perdidas cuando el equipo está dormido.
 
 ## Estructura del proyecto
 
@@ -187,6 +206,9 @@ Ejemplo para correr todos los días a las 08:00:
 ├── config.py        # Carga/validación de configuración
 ├── templates/
 │   └── post_prompt.txt
+├── systemd/
+│   ├── montessori-blog.service
+│   └── montessori-blog.timer
 ├── topics.yml        # Configuración editorial por vertical
 ├── brand_kits.yml    # Configuración visual de marca para portadas
 ├── data/
