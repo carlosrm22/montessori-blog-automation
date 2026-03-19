@@ -103,13 +103,19 @@ def mark_processed(
     )
 
 
-def get_all_processed_urls(topic_id: str = "default") -> set[str]:
+def get_all_processed_urls(
+    topic_id: str = "default",
+    statuses: tuple[str, ...] | None = None,
+) -> set[str]:
     with _connect() as conn:
         _migrate_if_needed(conn)
-        rows = conn.execute(
-            "SELECT url FROM processed_articles WHERE topic_id = ?",
-            (topic_id,),
-        ).fetchall()
+        sql = "SELECT url FROM processed_articles WHERE topic_id = ?"
+        params: list[str] = [topic_id]
+        if statuses:
+            placeholders = ",".join("?" for _ in statuses)
+            sql += f" AND status IN ({placeholders})"
+            params.extend(statuses)
+        rows = conn.execute(sql, params).fetchall()
         return {row[0] for row in rows}
 
 

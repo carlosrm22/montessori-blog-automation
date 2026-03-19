@@ -16,6 +16,7 @@ logger = logging.getLogger(__name__)
 
 BRAVE_ENDPOINT = "https://api.search.brave.com/res/v1/web/search"
 CSE_ENDPOINT = "https://www.googleapis.com/customsearch/v1"
+SEARCH_TERMINAL_STATUSES = ("processed", "published_draft", "dry_run", "wp_failed")
 
 
 @dataclass
@@ -169,7 +170,10 @@ def search_all(
 ) -> list[SearchResult]:
     """Run queries, deduplicate, filter already processed for a topic."""
     queries = queries or config.SEARCH_QUERIES
-    processed_urls = state.get_all_processed_urls(topic_id=topic_id)
+    processed_urls = state.get_all_processed_urls(
+        topic_id=topic_id,
+        statuses=SEARCH_TERMINAL_STATUSES,
+    )
     seen_urls: set[str] = set()
     results: list[SearchResult] = []
 

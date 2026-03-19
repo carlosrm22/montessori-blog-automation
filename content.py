@@ -130,6 +130,15 @@ def _clean_spaces(text: str) -> str:
     return " ".join((text or "").split())
 
 
+def _contains_exact_phrase(text: str, phrase: str) -> bool:
+    haystack = _clean_spaces(text)
+    needle = _clean_spaces(phrase)
+    if not haystack or not needle:
+        return False
+    pattern = r"(?<!\w)" + re.escape(needle) + r"(?!\w)"
+    return re.search(pattern, haystack, flags=re.IGNORECASE | re.UNICODE) is not None
+
+
 def _truncate(text: str, max_len: int, add_ellipsis: bool = False) -> str:
     text = _clean_spaces(text)
     if len(text) <= max_len:
@@ -155,6 +164,20 @@ def _normalize_tags(tags: list[str]) -> list[str]:
         if len(normalized) >= config.MAX_TAGS:
             break
     return normalized
+
+
+def _derive_focus_phrase_candidate(text: str, max_words: int = 5) -> str:
+    tokens = re.findall(r"[A-Za-zÁÉÍÓÚáéíóúÑñÜü0-9]+", _clean_spaces(text))
+    if not tokens:
+        return ""
+    trimmed = tokens[:max_words]
+    trailing_stopwords = {
+        "a", "al", "con", "de", "del", "e", "el", "en", "la", "las",
+        "los", "para", "por", "un", "una", "y",
+    }
+    while len(trimmed) > 2 and trimmed[-1].lower() in trailing_stopwords:
+        trimmed.pop()
+    return _truncate(" ".join(trimmed), 60)
 
 
 def _normalize_for_compare(text: str) -> str:
@@ -205,6 +228,19 @@ def _with_site_suffix(title: str, max_len: int) -> str:
         return _truncate(base, max_len)
     base_cut = _truncate(base, allowed_base_len).rstrip(" :;,-|/")
     return f"{base_cut}{suffix}"
+
+
+def _strip_site_suffix(title: str) -> str:
+    base = (title or "").strip()
+    site_title = _clean_spaces(config.SITE_TITLE)
+    separator = _clean_spaces(config.TITLE_SEPARATOR) or "|"
+    if not base or not site_title:
+        return base
+
+    suffix = f" {separator} {site_title}"
+    if base.endswith(suffix):
+        return base[: -len(suffix)].rstrip(" :;,-|/")
+    return base
 
 
 def _max_base_len_with_site_suffix(max_len: int) -> int:
@@ -296,12 +332,12 @@ def _contains_blocked_mentions(post: GeneratedPost) -> str | None:
         post.title,
         post.body,
         post.excerpt,
-        post.seo_title,
+        _strip_site_suffix(post.seo_title),
         post.seo_description,
         post.focus_keyphrase,
-        post.og_title,
+        _strip_site_suffix(post.og_title),
         post.og_description,
-        post.twitter_title,
+        _strip_site_suffix(post.twitter_title),
         post.twitter_description,
         post.image_alt_text,
         " ".join(post.tags),
@@ -313,17 +349,95 @@ def _contains_blocked_mentions(post: GeneratedPost) -> str | None:
     return None
 
 
-def _extract_focus_keyphrase(data: dict, title: str, tags: list[str]) -> str:
+def _extract_focus_keyphrase(data: dict, title: str, plain_text: str, tags: list[str]) -> str:
     explicit = _clean_spaces(str(data.get("focus_keyphrase", "")))
-    if explicit:
-        words = explicit.split()
-        return _truncate(" ".join(words[: config.FOCUS_KEYPHRASE_MAX_WORDS]), 60)
-    if tags:
-        words = tags[0].split()
-        return _truncate(" ".join(words[: config.FOCUS_KEYPHRASE_MAX_WORDS]), 60)
-    words = re.findall(r"[A-Za-zÁÉÍÓÚáéíóúÑñÜü0-9]+", title)
-    phrase = " ".join(words[: config.FOCUS_KEYPHRASE_MAX_WORDS]) if words else "Educación Montessori"
-    return _truncate(phrase, 60)
+    title_prefix = re.split(r"[:|/\-]", title, maxsplit=1)[0]
+    candidates = [
+        explicit,
+        _derive_focus_phrase_candidate(title_prefix),
+        _derive_focus_phrase_candidate(title),
+        _derive_focus_phrase_candidate(tags[0]) if tags else "",
+    ]
+    searchable_text = f"{title} {plain_text}"
+    for candidate in candidates:
+        if candidate and _contains_exact_phrase(searchable_text, candidate):
+            return candidate
+    for candidate in candidates:
+        if candidate:
+            return candidate
+    return "Educación Montessori"
+
+
+def _ensure_exact_phrase(text: str, phrase: str, max_len: int) -> str:
+    base = _truncate(text, max_len, add_ellipsis=True)
+    phrase = _clean_spaces(phrase)
+    if not phrase:
+        return base
+    if _contains_exact_phrase(base, phrase):
+        return base
+    if not base:
+        return _truncate(phrase, max_len)
+    candidate = f"{phrase}: {base}"
+    if len(candidate) <= max_len:
+        return candidate
+    remaining = max_len - len(phrase) - 2
+    if remaining <= 0:
+        return _truncate(phrase, max_len)
+    return f"{phrase}: {_truncate(base, remaining, add_ellipsis=True)}"
+
+
+def _body_has_keyphrase_in_subheading(body: str, keyphrase: str) -> bool:
+    from bs4 import BeautifulSoup
+
+    soup = BeautifulSoup(body or "", "html.parser")
+    for heading in soup.find_all(["h2", "h3"]):
+        if _contains_exact_phrase(heading.get_text(" ", strip=True), keyphrase):
+            return True
+    return False
+
+
+def _align_focus_keyphrase(post: GeneratedPost) -> GeneratedPost:
+    if not post.focus_keyphrase:
+        return post
+
+    seo_base = _ensure_exact_phrase(
+        _strip_site_suffix(post.seo_title),
+        post.focus_keyphrase,
+        _max_base_len_with_site_suffix(config.SEO_TITLE_MAX_LEN),
+    )
+    post.seo_title = _with_site_suffix(seo_base, config.SEO_TITLE_MAX_LEN)
+    post.seo_description = _ensure_exact_phrase(
+        post.seo_description,
+        post.focus_keyphrase,
+        config.SEO_DESCRIPTION_MAX_LEN,
+    )
+    post.og_description = _ensure_exact_phrase(
+        post.og_description,
+        post.focus_keyphrase,
+        config.SOCIAL_DESCRIPTION_MAX_LEN,
+    )
+    post.twitter_description = _ensure_exact_phrase(
+        post.twitter_description,
+        post.focus_keyphrase,
+        config.SOCIAL_DESCRIPTION_MAX_LEN,
+    )
+
+    body_text = _html_to_text(post.body)
+    if not _contains_exact_phrase(body_text, post.focus_keyphrase):
+        intro = (
+            f"<p><strong>{post.focus_keyphrase}</strong> "
+            "ofrece una lente clara para interpretar la fuente y convertirla "
+            "en decisiones pedagógicas concretas.</p>\n"
+        )
+        post.body = intro + (post.body or "").lstrip()
+    if not _body_has_keyphrase_in_subheading(post.body, post.focus_keyphrase):
+        section = (
+            f"\n<h2>{post.focus_keyphrase} en la práctica educativa</h2>\n"
+            "<p>Este enfoque ayuda a traducir los hallazgos del artículo en "
+            "acciones observables para aula, familia y comunidad escolar.</p>\n"
+        )
+        post.body = (post.body or "").rstrip() + section
+    return post
 
 
 def _normalize_generated_post(data: dict) -> GeneratedPost:
@@ -347,7 +461,7 @@ def _normalize_generated_post(data: dict) -> GeneratedPost:
     ] or ["Educación Montessori"]
     tags = _normalize_tags(data.get("tags", []))
 
-    focus_keyphrase = _extract_focus_keyphrase(data, title, tags)
+    focus_keyphrase = _extract_focus_keyphrase(data, title, plain_text, tags)
 
     seo_base_max_len = _max_base_len_with_site_suffix(config.SEO_TITLE_MAX_LEN)
     seo_base = _truncate(data.get("seo_title", "") or title, seo_base_max_len)
@@ -408,7 +522,7 @@ def _normalize_generated_post(data: dict) -> GeneratedPost:
         125,
     )
 
-    return GeneratedPost(
+    post = GeneratedPost(
         title=title,
         body=body,
         excerpt=excerpt,
@@ -425,6 +539,28 @@ def _normalize_generated_post(data: dict) -> GeneratedPost:
         image_prompt=_clean_spaces(data.get("image_prompt", "")),
         image_alt_text=image_alt_text,
     )
+    return _align_focus_keyphrase(post)
+
+
+def _build_retry_guidance(last_error: str | None) -> str:
+    if not last_error:
+        return ""
+    if last_error.startswith("blocked:"):
+        blocked_term = last_error.split(":", 1)[1]
+        return (
+            "\n\n## Correccion obligatoria del intento anterior\n"
+            f"- El intento anterior incluyo el termino bloqueado '{blocked_term}'.\n"
+            "- No incluyas ese termino ni variantes en body, excerpt, tags, keyphrase o metadata.\n"
+            "- Devuelve titulos SEO/social limpios y sin sufijo de marca; el pipeline agregara la marca despues.\n"
+        )
+    if last_error.startswith("short:"):
+        return (
+            "\n\n## Correccion obligatoria del intento anterior\n"
+            "- El intento anterior quedo demasiado corto.\n"
+            "- Esta vez entrega entre 750 y 950 palabras reales en el body HTML.\n"
+            "- Amplia contexto, implicaciones y recomendaciones practicas sin inventar datos.\n"
+        )
+    return ""
 
 
 def generate_post(
@@ -435,16 +571,18 @@ def generate_post(
     template_name: str = "post_prompt.txt",
 ) -> GeneratedPost | None:
     """Generate an original blog post from a source article."""
-    prompt = _render_prompt(
+    base_prompt = _render_prompt(
         article,
         topic_name=topic_name,
         topic_writing_guidelines=topic_writing_guidelines,
         template_name=template_name,
     )
     client = genai.Client(api_key=config.GEMINI_API_KEY)
+    last_error: str | None = None
 
     for attempt in range(max_retries):
         try:
+            prompt = base_prompt + _build_retry_guidance(last_error)
             response = client.models.generate_content(
                 model=config.GEMINI_TEXT_MODEL,
                 contents=prompt,
@@ -473,6 +611,7 @@ def generate_post(
                     word_count,
                     config.MIN_BODY_WORDS,
                 )
+                last_error = f"short:{word_count}"
                 if attempt < max_retries - 1:
                     continue
                 return None
@@ -485,6 +624,7 @@ def generate_post(
                     attempt + 1,
                     blocked,
                 )
+                last_error = f"blocked:{blocked}"
                 if attempt < max_retries - 1:
                     continue
                 return None
@@ -493,6 +633,7 @@ def generate_post(
 
         except Exception as exc:
             logger.warning("Content generation attempt %d failed: %s", attempt + 1, exc)
+            last_error = f"exception:{type(exc).__name__}"
             if attempt < max_retries - 1:
                 continue
 
