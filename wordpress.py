@@ -396,6 +396,32 @@ def _sync_aioseo(post_id: int, post: GeneratedPost) -> None:
         logger.warning("AIOSEO sync response parse failed for post id=%d", post_id)
 
 
+def count_posts_by_status(status: str = "draft") -> int | None:
+    """Return the total number of posts in a given WordPress status."""
+    clean_status = " ".join((status or "").split()).lower()
+    if not clean_status:
+        return None
+
+    resp = _request(
+        "get",
+        "posts",
+        params={"status": clean_status, "per_page": 1, "context": "edit"},
+        retry_on_500=False,
+    )
+    if not resp:
+        return None
+
+    total = resp.headers.get("X-WP-Total", "").strip()
+    try:
+        return int(total)
+    except Exception:
+        try:
+            payload = resp.json()
+        except Exception:
+            return None
+        return len(payload) if isinstance(payload, list) else None
+
+
 def list_recent_published_posts(limit: int = 6, exclude_ids: set[int] | None = None) -> list[dict]:
     """Return recent published posts with canonical link and optional featured image."""
     if limit <= 0:

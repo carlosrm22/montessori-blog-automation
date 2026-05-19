@@ -25,6 +25,7 @@ class BrandKit:
     brand_id: str
     display_name: str
     palette: dict[str, Any]
+    human_presence: str
     prompt_prefix: str
     negative: str
     postprocess: BrandPostProcess
@@ -68,6 +69,11 @@ def _clamp(value: float, minimum: float, maximum: float) -> float:
     return max(minimum, min(maximum, value))
 
 
+def _normalize_human_presence(value: Any) -> str:
+    clean = str(value or "").strip().lower()
+    return clean if clean in {"high", "medium", "low"} else ""
+
+
 def load_brand_kit(brand_id: str | None = None) -> BrandKit:
     """Load one brand kit from YAML with resilient defaults."""
     chosen_brand = (brand_id or config.BRAND_KIT or "ammac").strip().lower()
@@ -96,6 +102,7 @@ def load_brand_kit(brand_id: str | None = None) -> BrandKit:
         brand_id=resolved_brand,
         display_name=str(data.get("display_name", resolved_brand or "brand")).strip(),
         palette=dict(data.get("palette", {}) or {}),
+        human_presence=_normalize_human_presence(data.get("human_presence")),
         prompt_prefix=str(data.get("prompt_prefix", "")).strip(),
         negative=str(data.get("negative", "")).strip(),
         postprocess=BrandPostProcess(
@@ -125,6 +132,25 @@ def _palette_tokens(palette: dict[str, Any]) -> list[str]:
     return tokens[:10]
 
 
+def _human_presence_line(value: str) -> str:
+    if value == "high":
+        return (
+            "Human presence: high; show people as part of the learning scene, "
+            "while keeping children non-identifiable and avoiding central close-up faces."
+        )
+    if value == "medium":
+        return (
+            "Human presence: medium; prefer hands, partial figures, side or back views, "
+            "and a guide accompanying without central close-up faces."
+        )
+    if value == "low":
+        return (
+            "Human presence: low; prefer Montessori materials, prepared environment details, "
+            "hands only if useful, and no prominent people."
+        )
+    return ""
+
+
 def build_cover_prompt(subject_prompt: str, kit: BrandKit, width: int, height: int) -> str:
     """Build one prompt with style + palette + negative constraints."""
     ratio = round(width / max(height, 1), 2)
@@ -139,6 +165,7 @@ def build_cover_prompt(subject_prompt: str, kit: BrandKit, width: int, height: i
 
     parts = [
         kit.prompt_prefix,
+        _human_presence_line(kit.human_presence),
         palette_line,
         f"Subject: {subject_prompt.strip()}",
         negative_line,

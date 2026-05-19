@@ -121,7 +121,7 @@ def score_article(
     try:
         client = genai.Client(api_key=config.GEMINI_API_KEY)
         response = client.models.generate_content(
-            model=config.GEMINI_TEXT_MODEL,
+            model=config.GEMINI_SCORER_MODEL,
             contents=prompt,
             config=genai.types.GenerateContentConfig(
                 response_mime_type="application/json",

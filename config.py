@@ -84,6 +84,9 @@ def validate() -> None:
     if TOPICS_MAX_POSTS_PER_RUN <= 0:
         logging.critical("TOPICS_MAX_POSTS_PER_RUN debe ser mayor a 0")
         sys.exit(1)
+    if MIN_DRAFT_BUFFER < 0:
+        logging.critical("MIN_DRAFT_BUFFER no puede ser negativo")
+        sys.exit(1)
     if PUBLISH_INTERVAL_DAYS < 0:
         logging.critical("PUBLISH_INTERVAL_DAYS no puede ser negativo")
         sys.exit(1)
@@ -194,8 +197,21 @@ BLOCKED_MENTION_TERMS = [
 MIN_USABILITY_SCORE = float(os.environ.get("MIN_USABILITY_SCORE", "0.6"))
 MIN_BODY_WORDS = int(os.environ.get("MIN_BODY_WORDS", "600"))
 DRY_RUN = os.environ.get("DRY_RUN", "0") == "1"
-GEMINI_TEXT_MODEL = os.environ.get("GEMINI_TEXT_MODEL", "gemini-2.5-flash")
-GEMINI_IMAGE_MODEL = os.environ.get("GEMINI_IMAGE_MODEL", "gemini-2.5-flash-image")
+_LEGACY_GEMINI_TEXT_MODEL = os.environ.get("GEMINI_TEXT_MODEL", "").strip()
+GEMINI_TEXT_MODEL = _LEGACY_GEMINI_TEXT_MODEL or "gemini-2.5-flash"
+GEMINI_SCORER_MODEL = (
+    os.environ.get("GEMINI_SCORER_MODEL", "").strip()
+    or _LEGACY_GEMINI_TEXT_MODEL
+    or "gemini-2.5-flash"
+)
+GEMINI_CONTENT_MODEL = (
+    os.environ.get("GEMINI_CONTENT_MODEL", "").strip()
+    or _LEGACY_GEMINI_TEXT_MODEL
+    or "gemini-2.5-pro"
+)
+GEMINI_IMAGE_MODEL = (
+    os.environ.get("GEMINI_IMAGE_MODEL", "").strip() or "gemini-2.5-flash-image"
+)
 AIOSEO_SYNC = os.environ.get("AIOSEO_SYNC", "0") == "1"
 LOCAL_SEO_RULES_ENABLED = os.environ.get("LOCAL_SEO_RULES_ENABLED", "1") == "1"
 TRUSEO_MIN_SCORE = int(os.environ.get("TRUSEO_MIN_SCORE", "70"))
@@ -253,6 +269,7 @@ TOPIC_IDS = [
     if t.strip()
 ]
 TOPICS_MAX_POSTS_PER_RUN = int(os.environ.get("TOPICS_MAX_POSTS_PER_RUN", "1"))
+MIN_DRAFT_BUFFER = int(os.environ.get("MIN_DRAFT_BUFFER", "0"))
 PUBLISH_INTERVAL_DAYS = int(os.environ.get("PUBLISH_INTERVAL_DAYS", "7"))
 DB_PATH = DATA_DIR / "blog_state.db"
 WP_SITE_DOMAIN = (urlparse(WP_SITE_URL).netloc or "").lower()

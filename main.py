@@ -10,7 +10,12 @@ from search import search_all
 from scorer import select_best
 from content import generate_post
 from image_gen import generate_cover_image
-from wordpress import upload_media, create_draft, list_recent_published_posts
+from wordpress import (
+    upload_media,
+    create_draft,
+    list_recent_published_posts,
+    count_posts_by_status,
+)
 from source_fetch import enrich_article
 from topics import TopicProfile, load_topics
 from seo_rules import analyze_headline, analyze_truseo, build_slug
@@ -21,6 +26,24 @@ logger = logging.getLogger(__name__)
 
 
 def _is_publish_due() -> bool:
+    if config.MIN_DRAFT_BUFFER > 0:
+        draft_count = count_posts_by_status(status="draft")
+        if draft_count is None:
+            logger.warning(
+                "No se pudo consultar WordPress para contar borradores. Se mantiene la regla de cadencia."
+            )
+        else:
+            logger.info(
+                "Borradores actuales en WordPress: %d (mínimo objetivo: %d)",
+                draft_count,
+                config.MIN_DRAFT_BUFFER,
+            )
+            if draft_count < config.MIN_DRAFT_BUFFER:
+                logger.info(
+                    "Stock de borradores por debajo del mínimo. Se permite publicar en esta corrida."
+                )
+                return True
+
     if config.PUBLISH_INTERVAL_DAYS == 0:
         return True
 

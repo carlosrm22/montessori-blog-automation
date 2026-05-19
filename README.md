@@ -62,11 +62,14 @@ Variables principales:
 - `SEARCH_QUERIES`: fallback de consultas separadas por coma (solo si falta `topics.yml`).
 - `TOPIC_IDS`: lista separada por coma para correr solo ciertos temas (ej. `montessori_core,constructivismo`).
 - `TOPICS_MAX_POSTS_PER_RUN`: máximo de borradores por corrida.
-- `PUBLISH_INTERVAL_DAYS`: días mínimos entre publicaciones globales (default `7`, `0` = desactivar).
+- `MIN_DRAFT_BUFFER`: mínimo de borradores activos en WordPress que se intentan mantener; si hay menos, el pipeline puede publicar aunque no se haya cumplido la cadencia.
+- `PUBLISH_INTERVAL_DAYS`: días mínimos entre publicaciones globales cuando el colchón de borradores está sano (default `7`, `0` = desactivar).
 - `MIN_USABILITY_SCORE`: umbral mínimo para publicar.
 - `MIN_BODY_WORDS`: mínimo de palabras requeridas para el body (default `600`).
 - `DRY_RUN`: `1` para simular sin publicar; `0` para publicar borradores.
-- `GEMINI_TEXT_MODEL`: modelo para scoring y generación de texto (default `gemini-2.5-flash`).
+- `GEMINI_TEXT_MODEL`: modelo legacy usado como fallback para scoring/contenido si no defines los modelos específicos (default `gemini-2.5-flash`).
+- `GEMINI_SCORER_MODEL`: modelo para scoring de relevancia (default `gemini-2.5-flash`, o `GEMINI_TEXT_MODEL` si está definido).
+- `GEMINI_CONTENT_MODEL`: modelo para generación de artículos (default `gemini-2.5-pro`, o `GEMINI_TEXT_MODEL` si está definido).
 - `GEMINI_IMAGE_MODEL`: modelo para portada (default `gemini-2.5-flash-image`).
 - `AIOSEO_SYNC`: `1` para sincronizar title/description/OG/Twitter en AIOSEO (opcional, default `0`).
 - `LOCAL_SEO_RULES_ENABLED`: habilita evaluación SEO local (`1` por defecto).
@@ -118,10 +121,17 @@ El archivo [`topics.yml`](/home/carlos/montessori-blog-automation/topics.yml) de
 El archivo [`brand_kits.yml`](/home/carlos/montessori-blog-automation/brand_kits.yml) define estilo visual por marca:
 
 - `prompt_prefix`
+- `human_presence` (`high`, `medium`, `low`) para controlar si la portada prioriza personas, manos/figuras parciales o solo materiales/ambiente
 - `palette`
 - `negative`
 - `postprocess` (tinte, contraste, saturación)
 - `logo` (ruta, posición, escala, opacidad y margen)
+
+Valores de `human_presence`:
+
+- `high`: personas visibles como parte de la escena, manteniendo niñas y niños no identificables.
+- `medium`: manos, figuras parciales, vista lateral/de espaldas y Guía acompañando sin rostros centrales.
+- `low`: materiales Montessori, detalles del ambiente preparado y presencia humana mínima.
 
 ## Ejecución
 
@@ -158,8 +168,8 @@ En este modo no publica en WordPress, pero sí ejecuta búsqueda, evaluación, g
 
 ## Programación automática (systemd)
 
-Recomendación: correr diario y dejar que el candado de cadencia (`PUBLISH_INTERVAL_DAYS`) decida si toca publicar.
-Con `PUBLISH_INTERVAL_DAYS=7`, publicará aproximadamente cada semana sin intervención humana.
+Recomendación: correr diario y combinar cadencia con un colchón mínimo de borradores.
+Con `MIN_DRAFT_BUFFER=2` y `PUBLISH_INTERVAL_DAYS=1`, el sistema intentará mantener al menos dos borradores activos y nunca publicará más de una vez al día salvo que ajustes también el límite por corrida.
 
 El repositorio incluye units listos para `systemd --user` en `systemd/montessori-blog.service` y `systemd/montessori-blog.timer`.
 

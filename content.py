@@ -584,7 +584,7 @@ def generate_post(
         try:
             prompt = base_prompt + _build_retry_guidance(last_error)
             response = client.models.generate_content(
-                model=config.GEMINI_TEXT_MODEL,
+                model=config.GEMINI_CONTENT_MODEL,
                 contents=prompt,
                 config=genai.types.GenerateContentConfig(
                     response_mime_type="application/json",

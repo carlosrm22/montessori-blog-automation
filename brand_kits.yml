@@ -5,13 +5,18 @@ brands:
       primary: "#CE976B"
       background: "#ECE2DD"
       accents: ["#E8CAB3", "#9D6F55", "#4C6970"]
+    human_presence: medium
     prompt_prefix: >
       Professional editorial documentary photography for an educational blog header.
       Warm natural daylight, natural wood Montessori materials, plants, calm human atmosphere.
-      Clean composition, realistic scene, shallow depth of field, soft film look.
+      Prefer non-identifiable children, side or back view, hands-on Montessori activity,
+      guides accompanying without central close-up faces, natural depth of field.
+      Natural imperfections, candid documentary realism, authentic Montessori environment,
+      not overly polished, not synthetic, not AI-looking.
     negative: >
       embedded text, typography, watermark, logo, brand names, signage,
-      low quality, distorted hands, extra fingers
+      low quality, distorted hands, extra fingers, identifiable child faces,
+      staged stock-photo smiles
     postprocess:
       tint_hex: "#CE976B"
       tint_opacity: 0.08
@@ -31,13 +36,18 @@ brands:
       primary: "#4E6971"
       background: "#FFFFFF"
       accents: ["#CECECE", "#9EA1A1", "#016DB3"]
+    human_presence: low
     prompt_prefix: >
       Clean minimalist editorial photography for an educational association blog header.
       Cool neutral lighting, uncluttered background, modern academic mood, subtle geometric shapes.
-      High realism, professional, calm and credible.
+      Prefer non-identifiable children, side or back view, hands-on Montessori activity,
+      guides accompanying without central close-up faces.
+      Subtle realistic imperfections, natural editorial photography, professional, calm and credible,
+      not synthetic, not AI-looking, no exaggerated depth of field.
     negative: >
       embedded text, typography, watermark, logo, brand names, signage,
-      cluttered background, low quality
+      cluttered background, low quality, identifiable child faces,
+      staged stock-photo smiles
     postprocess:
       tint_hex: "#4E6971"
       tint_opacity: 0.07
