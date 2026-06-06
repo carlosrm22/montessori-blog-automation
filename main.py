@@ -26,23 +26,37 @@ logger = logging.getLogger(__name__)
 
 
 def _is_publish_due() -> bool:
-    if config.MIN_DRAFT_BUFFER > 0:
+    draft_count = None
+    if config.MIN_DRAFT_BUFFER > 0 or config.MAX_DRAFT_BACKLOG > 0:
         draft_count = count_posts_by_status(status="draft")
         if draft_count is None:
             logger.warning(
                 "No se pudo consultar WordPress para contar borradores. Se mantiene la regla de cadencia."
             )
-        else:
+
+    # Techo: si la cola de borradores sin publicar es grande, no generar nada.
+    if config.MAX_DRAFT_BACKLOG > 0 and draft_count is not None:
+        if draft_count >= config.MAX_DRAFT_BACKLOG:
             logger.info(
-                "Borradores actuales en WordPress: %d (mínimo objetivo: %d)",
+                "Cola de borradores en WordPress (%d) alcanzó el máximo permitido (%d). "
+                "No se genera nada hasta despejar la cola.",
                 draft_count,
-                config.MIN_DRAFT_BUFFER,
+                config.MAX_DRAFT_BACKLOG,
             )
-            if draft_count < config.MIN_DRAFT_BUFFER:
-                logger.info(
-                    "Stock de borradores por debajo del mínimo. Se permite publicar en esta corrida."
-                )
-                return True
+            return False
+
+    # Piso: si hay menos borradores que el colchón, publicar aunque no toque por calendario.
+    if config.MIN_DRAFT_BUFFER > 0 and draft_count is not None:
+        logger.info(
+            "Borradores actuales en WordPress: %d (mínimo objetivo: %d)",
+            draft_count,
+            config.MIN_DRAFT_BUFFER,
+        )
+        if draft_count < config.MIN_DRAFT_BUFFER:
+            logger.info(
+                "Stock de borradores por debajo del mínimo. Se permite publicar en esta corrida."
+            )
+            return True
 
     if config.PUBLISH_INTERVAL_DAYS == 0:
         return True

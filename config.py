@@ -88,6 +88,12 @@ def validate() -> None:
     if MIN_DRAFT_BUFFER < 0:
         logging.critical("MIN_DRAFT_BUFFER no puede ser negativo")
         sys.exit(1)
+    if MAX_DRAFT_BACKLOG < 0:
+        logging.critical("MAX_DRAFT_BACKLOG no puede ser negativo")
+        sys.exit(1)
+    if MAX_DRAFT_BACKLOG and MIN_DRAFT_BUFFER and MAX_DRAFT_BACKLOG <= MIN_DRAFT_BUFFER:
+        logging.critical("MAX_DRAFT_BACKLOG debe ser mayor que MIN_DRAFT_BUFFER")
+        sys.exit(1)
     if PUBLISH_INTERVAL_DAYS < 0:
         logging.critical("PUBLISH_INTERVAL_DAYS no puede ser negativo")
         sys.exit(1)
@@ -271,6 +277,9 @@ TOPIC_IDS = [
 ]
 TOPICS_MAX_POSTS_PER_RUN = int(os.environ.get("TOPICS_MAX_POSTS_PER_RUN", "1"))
 MIN_DRAFT_BUFFER = int(os.environ.get("MIN_DRAFT_BUFFER", "0"))
+# Techo de borradores sin publicar en WordPress. Si la cola alcanza este número,
+# el pipeline NO genera nada hasta que se despeje. 0 = sin techo (desactivado).
+MAX_DRAFT_BACKLOG = int(os.environ.get("MAX_DRAFT_BACKLOG", "0"))
 PUBLISH_INTERVAL_DAYS = int(os.environ.get("PUBLISH_INTERVAL_DAYS", "7"))
 DB_PATH = DATA_DIR / "blog_state.db"
 WP_SITE_DOMAIN = (urlparse(WP_SITE_URL).netloc or "").lower()
