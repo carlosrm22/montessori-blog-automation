@@ -1,4 +1,12 @@
+# Verticales editoriales del blog montessorimexico.org, agrupadas por autor.
+# Cada autor tiene su voz (tone_file) y sus temas según especialidad:
+#   - Roxana  -> pedagogía Montessori, crianza, amor y cuidado        (brand: kalpilli)
+#   - Caridad -> académico, teórico, filosófico, arte                 (brand: ammac)
+#   - Carlos  -> humanismo, tecnología/IA, economía e interdisciplina (brand: ammac)
+# La rotación reparte las corridas entre todos los temas automáticamente.
+
 topics:
+  # ===================== ROXANA MUÑOZ =====================
   - id: montessori_core
     name: Montessori Global (Core)
     author_name: Roxana Muñoz
@@ -20,6 +28,51 @@ topics:
     writing_guidelines: >
       Conecta hallazgos globales con aplicaciones prácticas para familias y escuelas de distintos países.
 
+  - id: montessori_en_casa
+    name: Montessori en Casa y Crianza Respetuosa
+    author_name: Roxana Muñoz
+    tone_file: roxana.md
+    brand_kit: kalpilli
+    queries:
+      - "respectful parenting research"
+      - "Montessori at home activities"
+      - "crianza respetuosa apego evidencia"
+      - "autonomía del niño en casa"
+    categories:
+      - "Montessori en casa"
+      - "Desarrollo socioemocional"
+    min_score: 0.62
+    post_template: post_prompt.txt
+    scoring_guidelines: >
+      Prioriza contenido aplicable por familias en el hogar: vínculo, límites con respeto,
+      independencia y vida cotidiana. Penaliza consejos sin sustento o de tono comercial.
+    writing_guidelines: >
+      Habla a madres, padres y cuidadores con calidez y firmeza; cada consejo práctico
+      anclado en el porqué pedagógico, siempre con el niño como centro.
+
+  - id: montessori_ambiente
+    name: Ambiente Preparado y Formación de Guías
+    author_name: Roxana Muñoz
+    tone_file: roxana.md
+    brand_kit: kalpilli
+    queries:
+      - "Montessori prepared environment"
+      - "Montessori materials practical life"
+      - "observación del niño Montessori"
+      - "formación guía Montessori"
+    categories:
+      - "Ambiente Montessori"
+      - "Formación Montessori"
+    min_score: 0.62
+    post_template: post_prompt.txt
+    scoring_guidelines: >
+      Prioriza el ambiente preparado, los materiales, la observación y la formación de la Guía.
+      Penaliza contenido decorativo sin fundamento pedagógico.
+    writing_guidelines: >
+      Explica el sentido profundo del ambiente y la observación; vincula belleza y orden
+      con la independencia y el trabajo interior del niño.
+
+  # ===================== CARIDAD ROMERO MUÑOZ =====================
   - id: constructivismo
     name: Constructivismo y Aprendizaje Activo
     author_name: Caridad Roxana Romero Muñoz
@@ -39,8 +92,54 @@ topics:
       Prioriza hallazgos verificables sobre diseño de aprendizaje activo,
       andamiaje, evaluación formativa y transferencia al aula.
     writing_guidelines: >
-      Explica en lenguaje claro para docentes y familias cómo aplicar principios constructivistas.
+      Explica con rigor la teoría detrás de la práctica; distingue el concepto de sus usos
+      vulgarizados y ancla los argumentos en autores (Piaget, Vygotsky, Bruner).
 
+  - id: filosofia_educacion
+    name: Filosofía y Teoría de la Educación
+    author_name: Caridad Roxana Romero Muñoz
+    tone_file: caridad.md
+    brand_kit: ammac
+    queries:
+      - "philosophy of education research"
+      - "epistemology of learning theory"
+      - "filosofía de la educación contemporánea"
+      - "teorías del conocimiento aprendizaje"
+    categories:
+      - "Filosofía de la educación"
+      - "Educación"
+    min_score: 0.6
+    post_template: post_prompt.txt
+    scoring_guidelines: >
+      Prioriza pensamiento educativo riguroso: epistemología del aula, teorías del conocimiento,
+      pedagogía crítica y debates conceptuales. Penaliza opinión superficial o autoayuda.
+    writing_guidelines: >
+      Sitúa cada idea en su tradición teórica; desarrolla el argumento por etapas y cierra
+      con una pregunta o confrontación que prolongue la reflexión del lector.
+
+  - id: arte_educacion
+    name: Arte, Estética y Aprendizaje
+    author_name: Caridad Roxana Romero Muñoz
+    tone_file: caridad.md
+    brand_kit: ammac
+    queries:
+      - "arts education research evidence"
+      - "aesthetic education learning"
+      - "museum education children"
+      - "educación artística desarrollo infantil"
+    categories:
+      - "Arte y educación"
+      - "Música"
+    min_score: 0.6
+    post_template: post_prompt.txt
+    scoring_guidelines: >
+      Prioriza la relación entre arte, estética, cultura visual y aprendizaje, con mirada
+      curatorial y fundamento. Penaliza manualidades sin marco conceptual.
+    writing_guidelines: >
+      Aporta la perspectiva de la curaduría y la historia del arte; conecta lo estético con
+      lo cognitivo y lo formativo, con prosa cuidada y precisa.
+
+  # ===================== CARLOS ROMERO MUÑOZ =====================
   - id: educacion_humanista
     name: Educación Humanista y Desarrollo Socioemocional
     author_name: Carlos Alfonso Romero
@@ -61,3 +160,47 @@ topics:
       Evita enfoques pseudocientíficos o afirmaciones sin sustento.
     writing_guidelines: >
       Mantén tono práctico y riguroso, con recomendaciones aplicables en contextos escolares internacionales.
+
+  - id: tecnologia_educacion
+    name: Tecnología, IA y Aprendizaje
+    author_name: Carlos Alfonso Romero
+    tone_file: carlos.md
+    brand_kit: ammac
+    queries:
+      - "artificial intelligence in education research"
+      - "edtech evidence classroom"
+      - "inteligencia artificial educación infancia"
+      - "tecnología y aprendizaje escuela"
+    categories:
+      - "Tecnología educativa"
+      - "Inteligencia Artificial"
+    min_score: 0.6
+    post_template: post_prompt.txt
+    scoring_guidelines: >
+      Prioriza análisis sustentado sobre IA y tecnología en educación, con mirada crítica.
+      Penaliza promoción de productos, hype sin evidencia y tecnoutopías.
+    writing_guidelines: >
+      Examina la tecnología con ojo crítico y analógico; tiende puentes entre disciplinas
+      (educación, filosofía, economía) y subordina siempre la herramienta al niño y al sentido.
+
+  - id: economia_educacion
+    name: Economía, Finanzas e Interdisciplina Educativa
+    author_name: Carlos Alfonso Romero
+    tone_file: carlos.md
+    brand_kit: ammac
+    queries:
+      - "economics of education research"
+      - "financial literacy children schools"
+      - "economía de la educación evidencia"
+      - "educación financiera infancia"
+    categories:
+      - "Economía de la educación"
+      - "Educación de calidad"
+    min_score: 0.6
+    post_template: post_prompt.txt
+    scoring_guidelines: >
+      Prioriza evidencia sobre economía de la educación, financiamiento, educación financiera
+      y costo-beneficio formativo. Penaliza ideología sin datos y contenido de venta.
+    writing_guidelines: >
+      Conecta economía y finanzas con el sentido educativo; usa analogías entre campos para
+      iluminar, no para impresionar, y aterriza en lo aplicable a familias y escuelas.
