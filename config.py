@@ -281,6 +281,10 @@ MIN_DRAFT_BUFFER = int(os.environ.get("MIN_DRAFT_BUFFER", "0"))
 # el pipeline NO genera nada hasta que se despeje. 0 = sin techo (desactivado).
 MAX_DRAFT_BACKLOG = int(os.environ.get("MAX_DRAFT_BACKLOG", "0"))
 PUBLISH_INTERVAL_DAYS = int(os.environ.get("PUBLISH_INTERVAL_DAYS", "7"))
+# Generador de cuadernillos (fuente del diplomado, runner aparte). Tope conservador
+# por corrida y pausa entre cuadernillos para no saturar las APIs.
+CUADERNILLOS_MAX_PER_RUN = int(os.environ.get("CUADERNILLOS_MAX_PER_RUN", "10"))
+CUADERNILLOS_THROTTLE_SECONDS = float(os.environ.get("CUADERNILLOS_THROTTLE_SECONDS", "4"))
 DB_PATH = DATA_DIR / "blog_state.db"
 WP_SITE_DOMAIN = (urlparse(WP_SITE_URL).netloc or "").lower()
 INTERNAL_LINKS = [

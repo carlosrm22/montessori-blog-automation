@@ -1,0 +1,183 @@
+# Mapa de materias del Diplomado AMMAC -> autor, voz, marca, categorías y fuente.
+# Base del directorio con los cuadernillos:
+base_dir: "/home/carlos/Documentos/Diplomados/Nuevo 2026"
+
+# Autores (voz ya existente en tones/). brand_kit: kalpilli=Roxana, ammac=Caridad/Carlos.
+# md_files: archivo(s) .md fuente dentro de la carpeta, en orden de sesión.
+#           [] = sin fuente .md (se genera desde el slug del PDF + nombre de materia).
+materias:
+  - id: filosofia
+    folder: "1 Filosofía Montessori"
+    author_name: Roxana Muñoz
+    tone_file: roxana.md
+    brand_kit: kalpilli
+    categories: ["Educación Montessori", "Filosofía de la educación"]
+    md_files: ["filosofia_montessori_reestructurada_ammac.md"]
+
+  - id: metodos_observacion
+    folder: "2 Métodos de Observación"
+    author_name: Caridad Roxana Romero Muñoz
+    tone_file: caridad.md
+    brand_kit: ammac
+    categories: ["Investigación educativa", "Formación Montessori"]
+    md_files: ["metodos_de_observacion_reestructurada_ammac.md"]
+
+  - id: neuroeducacion
+    folder: "3 Neuroeducación"
+    author_name: Caridad Roxana Romero Muñoz
+    tone_file: caridad.md
+    brand_kit: ammac
+    categories: ["Neuroeducación", "Educación Montessori"]
+    md_files: ["neuroeducacion_reestructurada_ammac.md"]
+
+  - id: ambiente
+    folder: "4 Ambiente Montessori"
+    author_name: Roxana Muñoz
+    tone_file: roxana.md
+    brand_kit: kalpilli
+    categories: ["Ambiente Montessori", "Educación Montessori"]
+    md_files: []
+
+  - id: vida_practica
+    folder: "5 Vida Práctica"
+    author_name: Roxana Muñoz
+    tone_file: roxana.md
+    brand_kit: kalpilli
+    categories: ["Vida práctica", "Educación Montessori"]
+    md_files: ["vida_practica_casa_ammac.md"]
+
+  - id: presentaciones_preliminares
+    folder: "6 Presentaciones Preliminares"
+    author_name: Roxana Muñoz
+    tone_file: roxana.md
+    brand_kit: kalpilli
+    categories: ["Formación Montessori", "Educación Montessori"]
+    md_files: ["presentaciones_preliminares_taller_ammac.md"]
+
+  - id: psicomotricidad
+    folder: "7 Psicomotricidad"
+    author_name: Caridad Roxana Romero Muñoz
+    tone_file: caridad.md
+    brand_kit: ammac
+    categories: ["Psicomotricidad", "Desarrollo socioemocional"]
+    md_files: ["psicomotricidad_ammac.md"]
+
+  - id: sensorial
+    folder: "8 Sensorial"
+    author_name: Roxana Muñoz
+    tone_file: roxana.md
+    brand_kit: kalpilli
+    categories: ["Sensorial", "Educación Montessori"]
+    md_files: ["sensorial_casa_ammac.md"]
+
+  - id: vida_practica_nido
+    folder: "9 Vida Práctica Nido"
+    author_name: Roxana Muñoz
+    tone_file: roxana.md
+    brand_kit: kalpilli
+    categories: ["Vida práctica", "Montessori en casa"]
+    md_files: ["vida_practica_nido_ammac.md"]
+
+  - id: lenguaje_taller
+    folder: "10 Lenguaje Taller"
+    author_name: Caridad Roxana Romero Muñoz
+    tone_file: caridad.md
+    brand_kit: ammac
+    categories: ["Lenguaje", "Educación Montessori"]
+    md_files: ["lenguaje_taller1_ammac.md", "lenguaje_taller2_ammac.md"]
+
+  - id: psicologia_educativa
+    folder: "11 Psicología Educativa"
+    author_name: Caridad Roxana Romero Muñoz
+    tone_file: caridad.md
+    brand_kit: ammac
+    categories: ["Educación Montessori", "Desarrollo socioemocional"]
+    md_files: ["psicologia_educativa_ammac.md"]
+
+  - id: lenguaje_culturales_nido
+    folder: "12 Lenguaje Culturales Nido"
+    author_name: Roxana Muñoz
+    tone_file: roxana.md
+    brand_kit: kalpilli
+    categories: ["Lenguaje", "Montessori en casa"]
+    md_files: ["lenguaje_culturales_nido_ammac.md"]
+
+  - id: lenguaje_casa
+    folder: "13 Lenguaje Casa"
+    author_name: Roxana Muñoz
+    tone_file: roxana.md
+    brand_kit: kalpilli
+    categories: ["Lenguaje", "Montessori en casa"]
+    md_files: ["lenguaje_casa_ammac.md"]
+
+  - id: educacion_inclusiva
+    folder: "14 Educación Inclusiva"
+    author_name: Roxana Muñoz
+    tone_file: roxana.md
+    brand_kit: kalpilli
+    categories: ["Inclusión", "Educación Montessori"]
+    md_files: ["educacion_inclusiva_ammac.md"]
+
+  - id: sensorial_mates_nido
+    folder: "15 Sensorial Mates Nido"
+    author_name: Roxana Muñoz
+    tone_file: roxana.md
+    brand_kit: kalpilli
+    categories: ["Sensorial", "Montessori en casa"]
+    md_files: ["sensorial_mates_nido_ammac.md"]
+
+  - id: matematicas_casa
+    folder: "16 Matemáticas Casa"
+    author_name: Carlos Alfonso Romero
+    tone_file: carlos.md
+    brand_kit: ammac
+    categories: ["Matemáticas", "Montessori en casa"]
+    md_files: ["matematicas_casa.md"]
+
+  - id: matematicas_taller
+    folder: "17 Matemáticas Taller"
+    author_name: Carlos Alfonso Romero
+    tone_file: carlos.md
+    brand_kit: ammac
+    categories: ["Matemáticas", "Educación Montessori"]
+    md_files: ["matematicas_taller_parte1.md", "matematicas_taller_parte2.md"]
+
+  - id: pensamiento_creativo
+    folder: "18 Pensamiento Creativo"
+    author_name: Carlos Alfonso Romero
+    tone_file: carlos.md
+    brand_kit: ammac
+    categories: ["Pensamiento creativo", "Educación Montessori"]
+    md_files: ["pensamiento_creativo_ammac.md"]
+
+  - id: obstetricia_nutricion
+    folder: "19 Obstetricia Nutricion"
+    author_name: Caridad Roxana Romero Muñoz
+    tone_file: caridad.md
+    brand_kit: ammac
+    categories: ["Crianza y nutrición", "Montessori en casa"]
+    md_files: ["obstetricia_nutricion_nido.md"]
+
+  - id: culturales_casa
+    folder: "20 Culturales Casa"
+    author_name: Carlos Alfonso Romero
+    tone_file: carlos.md
+    brand_kit: ammac
+    categories: ["Educación cósmica", "Educación Montessori"]
+    md_files: ["culturales_casa .md"]
+
+  - id: culturales_taller
+    folder: "21 Culturales Taller"
+    author_name: Carlos Alfonso Romero
+    tone_file: carlos.md
+    brand_kit: ammac
+    categories: ["Educación cósmica", "Educación Montessori"]
+    md_files: ["culturales_taller.md"]
+
+  - id: campanas
+    folder: "22 Campanas Montessori"
+    author_name: Carlos Alfonso Romero
+    tone_file: carlos.md
+    brand_kit: ammac
+    categories: ["Música", "Educación Montessori"]
+    md_files: ["campanas_montessori_reestructurada_ammac.md"]
