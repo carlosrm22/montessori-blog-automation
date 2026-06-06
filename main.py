@@ -138,6 +138,8 @@ def run_topic_pipeline(topic: TopicProfile) -> bool:
         topic_name=topic.name,
         topic_writing_guidelines=topic.writing_guidelines,
         template_name=topic.post_template,
+        author_name=topic.author_name,
+        tone_file=topic.tone_file,
     )
     if post is None:
         logger.error("No se pudo generar contenido. Finalizando.")

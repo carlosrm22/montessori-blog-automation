@@ -86,11 +86,33 @@ def _is_public_source_url(url: str) -> bool:
     return True
 
 
+def _load_author_tone(tone_file: str) -> str:
+    """Carga la guía de tono/voz de un autor desde tones/. Tolerante a faltantes."""
+    name = (tone_file or "").strip()
+    if not name:
+        return ""
+    path = (config.TONES_DIR / name).resolve()
+    # Evita escapes fuera de la carpeta de tonos.
+    if config.TONES_DIR.resolve() not in path.parents:
+        logger.warning("tone_file '%s' fuera de TONES_DIR; se ignora.", tone_file)
+        return ""
+    if not path.is_file():
+        logger.warning("Tono de autor no encontrado: %s (se generará sin voz específica).", path)
+        return ""
+    try:
+        return path.read_text(encoding="utf-8").strip()
+    except Exception as exc:
+        logger.warning("No se pudo leer el tono '%s': %s", path, exc)
+        return ""
+
+
 def _render_prompt(
     article: SearchResult,
     topic_name: str = "Montessori",
     topic_writing_guidelines: str = "",
     template_name: str = "post_prompt.txt",
+    author_name: str = "",
+    author_tone: str = "",
 ) -> str:
     env = Environment(loader=FileSystemLoader(config.TEMPLATES_DIR))
     template = env.get_template(template_name)
@@ -99,6 +121,8 @@ def _render_prompt(
     return template.render(
         topic_name=topic_name,
         topic_writing_guidelines=topic_writing_guidelines,
+        author_name=author_name,
+        author_tone=author_tone,
         site_title=config.SITE_TITLE,
         title_separator=config.TITLE_SEPARATOR,
         title=article.title,
@@ -569,13 +593,20 @@ def generate_post(
     topic_name: str = "Montessori",
     topic_writing_guidelines: str = "",
     template_name: str = "post_prompt.txt",
+    author_name: str = "",
+    tone_file: str = "",
 ) -> GeneratedPost | None:
     """Generate an original blog post from a source article."""
+    author_tone = _load_author_tone(tone_file)
+    if author_tone:
+        logger.info("Aplicando voz del autor '%s' (tono: %s)", author_name, tone_file)
     base_prompt = _render_prompt(
         article,
         topic_name=topic_name,
         topic_writing_guidelines=topic_writing_guidelines,
         template_name=template_name,
+        author_name=author_name,
+        author_tone=author_tone,
     )
     client = genai.Client(api_key=config.GEMINI_API_KEY)
     last_error: str | None = None

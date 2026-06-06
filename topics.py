@@ -20,6 +20,7 @@ class TopicProfile:
     post_template: str
     scoring_guidelines: str
     writing_guidelines: str
+    tone_file: str = ""
 
 
 def _normalize_topic(raw: dict) -> TopicProfile:
@@ -37,6 +38,7 @@ def _normalize_topic(raw: dict) -> TopicProfile:
     post_template = str(raw.get("post_template", "post_prompt.txt")).strip() or "post_prompt.txt"
     scoring_guidelines = str(raw.get("scoring_guidelines", "")).strip()
     writing_guidelines = str(raw.get("writing_guidelines", "")).strip()
+    tone_file = str(raw.get("tone_file", "")).strip()
     return TopicProfile(
         topic_id=topic_id,
         name=name,
@@ -48,6 +50,7 @@ def _normalize_topic(raw: dict) -> TopicProfile:
         post_template=post_template,
         scoring_guidelines=scoring_guidelines,
         writing_guidelines=writing_guidelines,
+        tone_file=tone_file,
     )
 
 

@@ -2,6 +2,7 @@ topics:
   - id: montessori_core
     name: Montessori Global (Core)
     author_name: Roxana Muñoz
+    tone_file: roxana.md
     brand_kit: kalpilli
     queries:
       - "Montessori education research"
@@ -22,6 +23,7 @@ topics:
   - id: constructivismo
     name: Constructivismo y Aprendizaje Activo
     author_name: Caridad Roxana Romero Muñoz
+    tone_file: caridad.md
     brand_kit: ammac
     queries:
       - "constructivist education research"
@@ -42,6 +44,7 @@ topics:
   - id: educacion_humanista
     name: Educación Humanista y Desarrollo Socioemocional
     author_name: Carlos Alfonso Romero
+    tone_file: carlos.md
     brand_kit: ammac
     queries:
       - "humanistic education classroom"

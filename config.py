@@ -14,6 +14,7 @@ DATA_DIR = BASE_DIR / "data"
 IMAGES_DIR = DATA_DIR / "images"
 LOG_DIR = BASE_DIR / "logs"
 TEMPLATES_DIR = BASE_DIR / "templates"
+TONES_DIR = BASE_DIR / "tones"
 TOPICS_FILE = BASE_DIR / "topics.yml"
 
 load_dotenv(BASE_DIR / ".env")
