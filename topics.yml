@@ -1,8 +1,8 @@
 # Verticales editoriales del blog montessorimexico.org, agrupadas por autor.
-# Cada autor tiene su voz (tone_file) y sus temas según especialidad:
-#   - Roxana  -> pedagogía Montessori, crianza, amor y cuidado        (brand: kalpilli)
-#   - Caridad -> académico, teórico, filosófico, arte                 (brand: ammac)
-#   - Carlos  -> humanismo, tecnología/IA, economía e interdisciplina (brand: ammac)
+# Cada autor tiene su voz (tone_file) y 5 temas según su especialidad:
+#   - Roxana  -> pedagogía Montessori, crianza, humanismo, cuidado e inclusión  (brand: kalpilli)
+#   - Caridad -> académico, teórico, filosófico, arte e investigación           (brand: ammac)
+#   - Carlos  -> tecnología/IA, economía, interdisciplina y cultura digital     (brand: ammac)
 # La rotación reparte las corridas entre todos los temas automáticamente.
 
 topics:
@@ -72,6 +72,50 @@ topics:
       Explica el sentido profundo del ambiente y la observación; vincula belleza y orden
       con la independencia y el trabajo interior del niño.
 
+  - id: educacion_humanista
+    name: Educación Humanista y Desarrollo Socioemocional
+    author_name: Roxana Muñoz
+    tone_file: roxana.md
+    brand_kit: kalpilli
+    queries:
+      - "humanistic education classroom"
+      - "social emotional learning evidence schools"
+      - "educación humanista escuela"
+      - "autonomía estudiantil bienestar escolar"
+    categories:
+      - "Educación humanista"
+      - "Desarrollo socioemocional"
+    min_score: 0.62
+    post_template: post_prompt.txt
+    scoring_guidelines: >
+      Prioriza evidencia sobre autonomía, clima de aula, motivación intrínseca y bienestar.
+      Evita enfoques pseudocientíficos o afirmaciones sin sustento.
+    writing_guidelines: >
+      Aborda el bienestar y lo socioemocional con calidez y firmeza; conecta cada práctica
+      con el respeto al niño y su desarrollo integral.
+
+  - id: inclusion_diversidad
+    name: Educación Inclusiva y Diversidad
+    author_name: Roxana Muñoz
+    tone_file: roxana.md
+    brand_kit: kalpilli
+    queries:
+      - "inclusive education research"
+      - "neurodiversity classroom support"
+      - "educación inclusiva evidencia"
+      - "estrategias TDAH aula"
+    categories:
+      - "Inclusión"
+      - "TDAH"
+    min_score: 0.6
+    post_template: post_prompt.txt
+    scoring_guidelines: >
+      Prioriza prácticas inclusivas con evidencia: neurodiversidad, accesibilidad y atención
+      a la diferencia. Penaliza enfoques estigmatizantes o sin fundamento.
+    writing_guidelines: >
+      Defiende que el método llegue a todos los niños; vincula la inclusión con la observación,
+      el respeto al ritmo propio y el cuidado de cada niño como único.
+
   # ===================== CARIDAD ROMERO MUÑOZ =====================
   - id: constructivismo
     name: Constructivismo y Aprendizaje Activo
@@ -139,28 +183,51 @@ topics:
       Aporta la perspectiva de la curaduría y la historia del arte; conecta lo estético con
       lo cognitivo y lo formativo, con prosa cuidada y precisa.
 
-  # ===================== CARLOS ROMERO MUÑOZ =====================
-  - id: educacion_humanista
-    name: Educación Humanista y Desarrollo Socioemocional
-    author_name: Carlos Alfonso Romero
-    tone_file: carlos.md
+  - id: historia_pedagogia
+    name: Historia de la Educación y Grandes Pensadores
+    author_name: Caridad Roxana Romero Muñoz
+    tone_file: caridad.md
     brand_kit: ammac
     queries:
-      - "humanistic education classroom"
-      - "social emotional learning evidence schools"
-      - "educación humanista escuela"
-      - "autonomía estudiantil bienestar escolar"
+      - "history of pedagogy thinkers"
+      - "Dewey Freire educational thought"
+      - "historia de la educación pensadores"
+      - "pedagogos clásicos influencia actual"
     categories:
-      - "Educación humanista"
-      - "Desarrollo socioemocional"
+      - "Historia de la educación"
+      - "Educación"
+    min_score: 0.6
+    post_template: post_prompt.txt
+    scoring_guidelines: >
+      Prioriza el pensamiento de pedagogos y su vigencia, con rigor histórico y conceptual.
+      Penaliza biografías superficiales o efemérides sin análisis.
+    writing_guidelines: >
+      Sitúa a cada pensador en su contexto y tradición; muestra la genealogía de las ideas
+      y por qué siguen interpelándonos, cerrando con una pregunta abierta.
+
+  - id: investigacion_educativa
+    name: Investigación y Evidencia Educativa
+    author_name: Caridad Roxana Romero Muñoz
+    tone_file: caridad.md
+    brand_kit: ammac
+    queries:
+      - "education research methodology"
+      - "learning sciences evidence"
+      - "neurociencia del aprendizaje evidencia"
+      - "investigación educativa metodología"
+    categories:
+      - "Investigación educativa"
+      - "Educación de calidad"
     min_score: 0.62
     post_template: post_prompt.txt
     scoring_guidelines: >
-      Prioriza evidencia sobre autonomía, clima de aula, motivación intrínseca y bienestar.
-      Evita enfoques pseudocientíficos o afirmaciones sin sustento.
+      Prioriza estudios sólidos, metodología y lectura crítica de la evidencia.
+      Penaliza neuromitos, divulgación tergiversada y conclusiones sin sustento.
     writing_guidelines: >
-      Mantén tono práctico y riguroso, con recomendaciones aplicables en contextos escolares internacionales.
+      Examina la evidencia con rigor: qué muestra, qué no, y qué cautelas exige; distingue
+      el hallazgo del titular, con distancia analítica serena.
 
+  # ===================== CARLOS ROMERO MUÑOZ =====================
   - id: tecnologia_educacion
     name: Tecnología, IA y Aprendizaje
     author_name: Carlos Alfonso Romero
@@ -204,3 +271,69 @@ topics:
     writing_guidelines: >
       Conecta economía y finanzas con el sentido educativo; usa analogías entre campos para
       iluminar, no para impresionar, y aterriza en lo aplicable a familias y escuelas.
+
+  - id: interdisciplina
+    name: "Interdisciplina: Ciencia, Arte y Pensamiento"
+    author_name: Carlos Alfonso Romero
+    tone_file: carlos.md
+    brand_kit: ammac
+    queries:
+      - "interdisciplinary learning research"
+      - "STEAM education evidence"
+      - "pensamiento interdisciplinario educación"
+      - "conexiones entre ciencia arte aprendizaje"
+    categories:
+      - "Educación"
+      - "Inteligencia"
+    min_score: 0.6
+    post_template: post_prompt.txt
+    scoring_guidelines: >
+      Prioriza enfoques que cruzan disciplinas (ciencia, arte, tecnología, humanidades) con
+      sustento. Penaliza mezclas vistosas sin rigor ni aplicación.
+    writing_guidelines: >
+      Es tu terreno: enlaza campos aparentemente distantes para producir comprensión; cada
+      analogía debe ser un puente cognitivo real, no un adorno, y aterrizar en lo educativo.
+
+  - id: futuro_trabajo
+    name: Futuro del Trabajo y Habilidades del Siglo XXI
+    author_name: Carlos Alfonso Romero
+    tone_file: carlos.md
+    brand_kit: ammac
+    queries:
+      - "future of work skills education"
+      - "21st century skills evidence"
+      - "habilidades del futuro educación"
+      - "automatización empleo formación"
+    categories:
+      - "Educación de calidad"
+      - "Tecnología educativa"
+    min_score: 0.6
+    post_template: post_prompt.txt
+    scoring_guidelines: >
+      Prioriza prospectiva fundamentada sobre habilidades, automatización y empleo, con lectura
+      crítica. Penaliza listas de "skills" sin evidencia y futurología vacía.
+    writing_guidelines: >
+      Conecta economía, tecnología y desarrollo humano; cuestiona modas con ironía precisa
+      y devuelve la mirada al niño y a lo que de verdad forma para el futuro.
+
+  - id: cultura_digital
+    name: Cultura Digital, Medios y Pensamiento Crítico
+    author_name: Carlos Alfonso Romero
+    tone_file: carlos.md
+    brand_kit: ammac
+    queries:
+      - "media literacy research children"
+      - "screen time attention learning"
+      - "alfabetización mediática infancia"
+      - "pensamiento crítico medios digitales"
+    categories:
+      - "Cultura digital"
+      - "Tecnología educativa"
+    min_score: 0.6
+    post_template: post_prompt.txt
+    scoring_guidelines: >
+      Prioriza análisis sobre medios, atención, pantallas y alfabetización mediática con
+      evidencia. Penaliza pánico moral y también el optimismo tecnológico ingenuo.
+    writing_guidelines: >
+      Mira la cultura digital con filo crítico y analógico; ni demonizar ni idealizar la
+      pantalla, sino pensar qué le hace a la atención y al criterio del niño.
