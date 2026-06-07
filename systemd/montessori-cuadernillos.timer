@@ -1,0 +1,9 @@
+[Unit]
+Description=Montessori Cuadernillos Timer (diario, escalonado de noticias)
+
+[Timer]
+OnCalendar=*-*-* 10:00:00
+Persistent=true
+
+[Install]
+WantedBy=timers.target

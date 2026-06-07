@@ -1,0 +1,14 @@
+[Unit]
+Description=Montessori Cuadernillos -> Blog (lote diario)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/home/carlos/montessori-blog-automation/run_cuadernillos.sh
+WorkingDirectory=/home/carlos/montessori-blog-automation
+TimeoutStartSec=3600
+Environment=HOME=/home/carlos
+
+[Install]
+WantedBy=default.target
