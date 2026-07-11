@@ -139,17 +139,114 @@ class ConversionFunnelTests(unittest.TestCase):
         self.assertEqual(stats["contextual_links"], 1)
         self.assertEqual(stats["final_blocks"], 0)
 
-    def test_valid_controlled_insertion_is_idempotent(self):
+    def test_two_run_output_is_byte_identical_for_medium_and_high(self):
+        for relevance in ("medium", "high"):
+            with self.subTest(relevance=relevance):
+                decision = resolve_conversion_decision(
+                    "casa", relevance, f"ser-guia-{relevance}", "C\u00f3mo ser Gu\u00eda"
+                )
+                dirty_html = (
+                    f'{ARTICLE}<aside class="ammac-training-spoof">Falso</aside>'
+                    '<a href="https://certificacionmontessori.com/inventado/">'
+                    "Enlace no controlado</a>"
+                )
+                with patch("config.CONVERSION_CTA_ENABLED", True):
+                    first, _ = apply_conversion_funnel(dirty_html, decision)
+                    second, stats = apply_conversion_funnel(first, decision)
+
+                self.assertEqual(second, first)
+                self.assertEqual(stats["contextual_links"], 1)
+                self.assertEqual(
+                    stats["final_blocks"], 1 if relevance == "high" else 0
+                )
+
+    def test_generated_blocks_are_relocated_out_of_hidden_and_inert_ancestors(self):
         decision = resolve_conversion_decision(
             "casa", "high", "ser-guia-casa", "C\u00f3mo ser Gu\u00eda de Casa"
         )
-        with patch("config.CONVERSION_CTA_ENABLED", True):
-            inserted, _ = apply_conversion_funnel(ARTICLE, decision)
-            output, stats = apply_conversion_funnel(inserted, decision)
+        for unsafe_attribute in ("hidden", "inert"):
+            with self.subTest(unsafe_attribute=unsafe_attribute):
+                with patch("config.CONVERSION_CTA_ENABLED", True):
+                    generated, _ = apply_conversion_funnel(ARTICLE, decision)
 
-        self.assertEqual(output, inserted)
-        self.assertEqual(stats["contextual_links"], 1)
-        self.assertEqual(stats["final_blocks"], 1)
+                soup = BeautifulSoup(generated, "html.parser")
+                wrapper = soup.new_tag("div")
+                wrapper[unsafe_attribute] = ""
+                soup.insert(0, wrapper)
+                wrapper.append(soup.select_one("p.ammac-training-context").extract())
+                wrapper.append(soup.select_one("section.ammac-training-cta").extract())
+
+                with patch("config.CONVERSION_CTA_ENABLED", True):
+                    output, _ = apply_conversion_funnel(str(soup), decision)
+
+                rebuilt = BeautifulSoup(output, "html.parser")
+                for generated_element in rebuilt.select(
+                    ".ammac-training-context, .ammac-training-cta"
+                ):
+                    self.assertFalse(
+                        any(
+                            ancestor.has_attr("hidden") or ancestor.has_attr("inert")
+                            for ancestor in generated_element.parents
+                        )
+                    )
+
+    def test_attacker_anchor_wrapping_marked_content_is_neutralized(self):
+        decision = resolve_conversion_decision(
+            "casa", "medium", "observacion-casa", "Observaci\u00f3n en Casa"
+        )
+        hostile_url = "https://attacker.example/wrapper"
+        html = (
+            f'{ARTICLE}<a href="{hostile_url}">Texto anterior '
+            '<span class="ammac-training-context">Bloque generado falso</span>'
+            " texto posterior</a>"
+        )
+
+        with patch("config.CONVERSION_CTA_ENABLED", True):
+            output, _ = apply_conversion_funnel(html, decision)
+
+        soup = BeautifulSoup(output, "html.parser")
+        self.assertIsNone(soup.find("a", href=hostile_url))
+        self.assertIn("Texto anterior", soup.get_text())
+        self.assertIn("texto posterior", soup.get_text())
+
+    def test_contextual_insertion_skips_unsafe_paragraphs(self):
+        decision = resolve_conversion_decision(
+            "casa", "medium", "observacion-casa", "Observaci\u00f3n en Casa"
+        )
+        html = (
+            '<div hidden><p id="hidden">Oculto</p></div>'
+            '<div aria-hidden="true"><p id="aria-hidden">Oculto ARIA</p></div>'
+            '<div style="display: none"><p id="display-none">Sin display</p></div>'
+            '<div style="visibility:hidden"><p id="visibility-hidden">Invisible</p></div>'
+            '<div inert><p id="inert">Inerte</p></div>'
+            '<a href="https://fuente.example"><p id="inside-anchor">Enlace</p></a>'
+            '<p id="visible">Visible</p>'
+        )
+
+        with patch("config.CONVERSION_CTA_ENABLED", True):
+            output, _ = apply_conversion_funnel(html, decision)
+
+        soup = BeautifulSoup(output, "html.parser")
+        contextual = soup.select_one("p.ammac-training-context")
+        self.assertEqual(contextual.find_previous_sibling("p")["id"], "visible")
+
+    def test_contextual_insertion_uses_safe_root_fallback(self):
+        decision = resolve_conversion_decision(
+            "casa", "medium", "observacion-casa", "Observaci\u00f3n en Casa"
+        )
+        html = '<div hidden><p>Oculto</p></div><div inert><p>Inerte</p></div>'
+
+        with patch("config.CONVERSION_CTA_ENABLED", True):
+            output, _ = apply_conversion_funnel(html, decision)
+
+        soup = BeautifulSoup(output, "html.parser")
+        contextual = soup.select_one("p.ammac-training-context")
+        self.assertFalse(
+            any(
+                ancestor.has_attr("hidden") or ancestor.has_attr("inert")
+                for ancestor in contextual.parents
+            )
+        )
 
     def test_high_rebuilds_when_an_orphan_primary_cta_marker_is_present(self):
         decision = resolve_conversion_decision(
@@ -272,6 +369,44 @@ class ConversionFunnelTests(unittest.TestCase):
             html, stats = apply_conversion_funnel(ARTICLE, decision)
         self.assertEqual(html, ARTICLE)
         self.assertEqual(stats["cta_level"], "none")
+
+    def test_disabled_low_and_invalid_decisions_clean_without_promotion(self):
+        dirty_html = (
+            '<p><a href="https://fuente.example/articulo">Fuente normal</a></p>'
+            '<section class="ammac-training-cta">Contenido falso '
+            '<a href="https://attacker.example/offer">Oferta falsa</a></section>'
+            '<p><a href="https://certificacionmontessori.com/inventado/">'
+            "Certificaci\u00f3n no controlada</a></p>"
+        )
+        cases = (
+            (False, resolve_conversion_decision("casa", "high", "post", "Post")),
+            (True, resolve_conversion_decision("casa", "low", "post", "Post")),
+            (True, resolve_conversion_decision("invented", "high", "post", "Post")),
+        )
+
+        for enabled, decision in cases:
+            with self.subTest(enabled=enabled, decision=decision):
+                with patch("config.CONVERSION_CTA_ENABLED", enabled):
+                    output, stats = apply_conversion_funnel(dirty_html, decision)
+
+                soup = BeautifulSoup(output, "html.parser")
+                self.assertIsNotNone(
+                    soup.find("a", href="https://fuente.example/articulo")
+                )
+                self.assertIsNone(
+                    soup.find("a", href="https://attacker.example/offer")
+                )
+                self.assertIsNone(
+                    soup.find(
+                        "a",
+                        href="https://certificacionmontessori.com/inventado/",
+                    )
+                )
+                self.assertIn("Certificaci\u00f3n no controlada", soup.get_text())
+                self.assertFalse(soup.select("[class*='ammac-training-']"))
+                self.assertEqual(stats["cta_level"], "none")
+                self.assertEqual(stats["contextual_links"], 0)
+                self.assertEqual(stats["final_blocks"], 0)
 
     def test_strips_only_uncontrolled_commercial_links(self):
         html = (

@@ -125,6 +125,11 @@ def _contextual_paragraph(soup: BeautifulSoup, decision: ConversionDecision):
 def strip_uncontrolled_commercial_links(html: str) -> tuple[str, int]:
     """Remove model-authored links to the commercial host while preserving text."""
     soup = BeautifulSoup(html or "", "html.parser")
+    removed = _strip_uncontrolled_commercial_links(soup)
+    return str(soup), removed
+
+
+def _strip_uncontrolled_commercial_links(soup: BeautifulSoup) -> int:
     allowed_host = urlparse(config.CERTIFICATION_SITE_URL).hostname
     removed = 0
     for anchor in soup.find_all("a", href=True):
@@ -135,7 +140,7 @@ def strip_uncontrolled_commercial_links(html: str) -> tuple[str, int]:
         if host in {allowed_host, f"www.{allowed_host}"}:
             anchor.unwrap()
             removed += 1
-    return str(soup), removed
+    return removed
 
 
 def _final_cta(soup: BeautifulSoup, decision: ConversionDecision):
@@ -180,20 +185,6 @@ def _final_cta(soup: BeautifulSoup, decision: ConversionDecision):
     return section
 
 
-def _is_valid_controlled_contextual_link(
-    soup: BeautifulSoup,
-    link,
-    decision: ConversionDecision,
-) -> bool:
-    expected = _contextual_paragraph(BeautifulSoup("", "html.parser"), decision)
-    return link.parent is not None and str(link.parent) == str(expected)
-
-
-def _is_valid_controlled_final_cta(section, decision: ConversionDecision) -> bool:
-    expected = _final_cta(BeautifulSoup("", "html.parser"), decision)
-    return str(section) == str(expected)
-
-
 def _is_funnel_marker(element) -> bool:
     return (
         any(
@@ -204,53 +195,28 @@ def _is_funnel_marker(element) -> bool:
     )
 
 
-def _funnel_marker_elements(soup: BeautifulSoup):
-    return [element for element in soup.find_all(True) if _is_funnel_marker(element)]
+def _normalize_existing_funnel_content(soup: BeautifulSoup) -> None:
+    marked_elements = [
+        element for element in soup.find_all(True) if _is_funnel_marker(element)
+    ]
+    marked_anchors = [element for element in marked_elements if element.name == "a"]
 
+    ancestor_anchors = []
+    seen_ancestor_anchors = set()
+    for element in marked_elements:
+        for ancestor in element.parents:
+            if (
+                ancestor.name == "a"
+                and not _is_funnel_marker(ancestor)
+                and id(ancestor) not in seen_ancestor_anchors
+            ):
+                ancestor_anchors.append(ancestor)
+                seen_ancestor_anchors.add(id(ancestor))
 
-def _has_only_expected_funnel_markers(soup: BeautifulSoup, expected) -> bool:
-    marker_elements = _funnel_marker_elements(soup)
-    return len(marker_elements) == len(expected) and all(
-        any(marker is expected_marker for expected_marker in expected)
-        for marker in marker_elements
-    )
+    for anchor in ancestor_anchors:
+        if anchor.parent is not None:
+            anchor.unwrap()
 
-
-def _has_valid_controlled_insertion(
-    soup: BeautifulSoup,
-    decision: ConversionDecision,
-) -> bool:
-    contextual_links = soup.select("a.ammac-training-link")
-    contextual_blocks = soup.select(".ammac-training-context")
-    cta_blocks = soup.select(".ammac-training-cta")
-
-    if (
-        len(contextual_links) != 1
-        or len(contextual_blocks) != 1
-        or contextual_links[0].parent is not contextual_blocks[0]
-        or not _is_valid_controlled_contextual_link(soup, contextual_links[0], decision)
-    ):
-        return False
-
-    if decision.cta_level == "medium":
-        return not cta_blocks and _has_only_expected_funnel_markers(
-            soup, [contextual_blocks[0], contextual_links[0]]
-        )
-
-    if not (
-        len(cta_blocks) == 1
-        and cta_blocks[0].name == "section"
-        and _is_valid_controlled_final_cta(cta_blocks[0], decision)
-    ):
-        return False
-
-    expected = [contextual_blocks[0], contextual_links[0], cta_blocks[0]]
-    expected.extend(_funnel_marker_elements(cta_blocks[0]))
-    return _has_only_expected_funnel_markers(soup, expected)
-
-
-def _remove_marked_funnel_content(soup: BeautifulSoup) -> None:
-    marked_elements = _funnel_marker_elements(soup)
     marked_non_anchors = {
         id(element) for element in marked_elements if element.name != "a"
     }
@@ -262,40 +228,79 @@ def _remove_marked_funnel_content(soup: BeautifulSoup) -> None:
             continue
         element.decompose()
 
-    for element in marked_elements:
-        if element.name == "a" and element.parent is not None:
+    for element in marked_anchors:
+        if element.parent is not None:
             element.replace_with(NavigableString(element.get_text()))
+
+    _strip_uncontrolled_commercial_links(soup)
+
+
+def _is_hidden(element) -> bool:
+    attributes = getattr(element, "attrs", {})
+    if "hidden" in attributes or "inert" in attributes:
+        return True
+    if str(attributes.get("aria-hidden", "")).strip().lower() == "true":
+        return True
+
+    for declaration in str(attributes.get("style", "")).split(";"):
+        property_name, separator, value = declaration.partition(":")
+        if not separator:
+            continue
+        property_name = property_name.strip().lower()
+        value = value.split("!important", 1)[0].strip().lower()
+        if (property_name == "display" and value == "none") or (
+            property_name == "visibility" and value == "hidden"
+        ):
+            return True
+    return False
+
+
+def _is_safe_insertion_target(element) -> bool:
+    return all(
+        ancestor.name != "a" and not _is_hidden(ancestor)
+        for ancestor in (element, *element.parents)
+    )
+
+
+def _safe_root(soup: BeautifulSoup):
+    if soup.body is not None and _is_safe_insertion_target(soup.body):
+        return soup.body
+    return soup
 
 
 def apply_conversion_funnel(
     html: str,
     decision: ConversionDecision,
 ) -> tuple[str, dict[str, object]]:
-    if not config.CONVERSION_CTA_ENABLED or decision.cta_level == "none":
-        return html, {"cta_level": "none", "contextual_links": 0, "final_blocks": 0}
-
     soup = BeautifulSoup(html or "", "html.parser")
-    if _has_valid_controlled_insertion(soup, decision):
+    _normalize_existing_funnel_content(soup)
+
+    if not config.CONVERSION_CTA_ENABLED or decision.cta_level not in {
+        "medium",
+        "high",
+    }:
         return str(soup), {
-            "cta_level": decision.cta_level,
-            "contextual_links": 1,
-            "final_blocks": 1 if decision.cta_level == "high" else 0,
+            "cta_level": "none",
+            "contextual_links": 0,
+            "final_blocks": 0,
         }
 
-    _remove_marked_funnel_content(soup)
-
     contextual = _contextual_paragraph(soup, decision)
-    paragraphs = soup.find_all("p")
+    paragraphs = [
+        paragraph
+        for paragraph in soup.find_all("p")
+        if _is_safe_insertion_target(paragraph)
+    ]
     if len(paragraphs) >= 2:
         paragraphs[1].insert_after(contextual)
     elif paragraphs:
         paragraphs[0].insert_after(contextual)
     else:
-        soup.insert(0, contextual)
+        _safe_root(soup).insert(0, contextual)
 
     final_blocks = 0
     if decision.cta_level == "high":
-        soup.append(_final_cta(soup, decision))
+        _safe_root(soup).append(_final_cta(soup, decision))
         final_blocks = 1
 
     return str(soup), {
