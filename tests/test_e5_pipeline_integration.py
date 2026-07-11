@@ -9,6 +9,7 @@ import config
 import main
 import notifier
 import run_cuadernillos
+import wordpress
 from content import GeneratedPost
 from conversion_funnel import resolve_conversion_decision
 from cuadernillo_source import Cuadernillo
@@ -102,6 +103,17 @@ def _config_patch(quality_count=6, gallery_count=2):
 
 
 class E5PipelineIntegrationTests(unittest.TestCase):
+    def _malformed_history_response(self):
+        response = Mock()
+        response.json.return_value = [
+            {
+                "id": 0,
+                "link": "https://wordpress.example.test/post",
+                "title": {"rendered": "Malformed history"},
+            }
+        ]
+        return response
+
     def test_main_accepted_flow_reuses_recent_posts_and_records_failed_notification(self):
         article = SearchResult(
             title="Fuente editorial",
@@ -611,6 +623,111 @@ class E5PipelineIntegrationTests(unittest.TestCase):
         self.assertIn("Quality gate", rendered)
         self.assertNotIn(private_detail, rendered)
         self.assertNotIn("wordpress.example.test", rendered)
+
+    def test_main_malformed_history_row_stops_before_downstream_side_effects(self):
+        article = SearchResult(
+            title="Fuente editorial",
+            url="https://source.example.test/article",
+            snippet="Resumen",
+        )
+        forbidden_names = (
+            "strip_uncontrolled_commercial_links",
+            "sanitize_and_enrich_body",
+            "apply_conversion_funnel",
+            "generate_cover_image",
+            "upload_media",
+            "create_draft",
+            "notify_draft_created",
+        )
+        with ExitStack() as stack:
+            stack.enter_context(_config_patch())
+            stack.enter_context(patch.object(main, "search_all", return_value=[article]))
+            stack.enter_context(
+                patch.object(main, "select_best", return_value=(article, 0.91))
+            )
+            stack.enter_context(patch.object(main, "enrich_article", return_value=article))
+            stack.enter_context(patch.object(main, "generate_post", return_value=_post()))
+            stack.enter_context(
+                patch.object(
+                    wordpress,
+                    "_request",
+                    return_value=self._malformed_history_response(),
+                )
+            )
+            recent_fetch = stack.enter_context(
+                patch.object(
+                    main,
+                    "list_recent_published_posts",
+                    wraps=wordpress.list_recent_published_posts,
+                )
+            )
+            forbidden = {
+                name: stack.enter_context(patch.object(main, name))
+                for name in forbidden_names
+            }
+            seo_report = stack.enter_context(patch.object(main.state, "save_seo_report"))
+            marked = stack.enter_context(patch.object(main.state, "mark_processed"))
+
+            result = main.run_topic_pipeline(_topic())
+
+        self.assertFalse(result)
+        recent_fetch.assert_called_once_with(limit=6)
+        for mocked in forbidden.values():
+            mocked.assert_not_called()
+        seo_report.assert_not_called()
+        self.assertEqual(marked.call_args.kwargs["status"], "quality_history_unavailable")
+
+    def test_cuadernillo_malformed_history_row_stops_before_downstream_side_effects(self):
+        forbidden_names = (
+            "strip_uncontrolled_commercial_links",
+            "sanitize_and_enrich_body",
+            "apply_conversion_funnel",
+            "generate_cover_image",
+            "upload_media",
+            "create_draft",
+            "notify_draft_created",
+        )
+        with ExitStack() as stack:
+            stack.enter_context(_config_patch())
+            stack.enter_context(
+                patch.object(run_cuadernillos, "generate_post", return_value=_post())
+            )
+            stack.enter_context(
+                patch.object(
+                    wordpress,
+                    "_request",
+                    return_value=self._malformed_history_response(),
+                )
+            )
+            recent_fetch = stack.enter_context(
+                patch.object(
+                    run_cuadernillos,
+                    "list_recent_published_posts",
+                    wraps=wordpress.list_recent_published_posts,
+                )
+            )
+            forbidden = {
+                name: stack.enter_context(patch.object(run_cuadernillos, name))
+                for name in forbidden_names
+            }
+            seo_report = stack.enter_context(
+                patch.object(run_cuadernillos.state, "save_seo_report")
+            )
+            marked = stack.enter_context(
+                patch.object(run_cuadernillos.state, "mark_processed")
+            )
+
+            result = run_cuadernillos._process_one(_cuadernillo(), dry_run=False)
+
+        self.assertFalse(result)
+        recent_fetch.assert_called_once_with(limit=6)
+        for mocked in forbidden.values():
+            mocked.assert_not_called()
+        seo_report.assert_not_called()
+        self.assertEqual(
+            marked.call_args.kwargs["status"],
+            "cuad_quality_history_unavailable",
+        )
 
     def test_draft_runners_have_no_indexnow_path(self):
         runner_source = "\n".join(

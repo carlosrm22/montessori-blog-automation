@@ -557,6 +557,96 @@ class ConversionFunnelTests(unittest.TestCase):
         self.assertEqual(len(soup.select("a")), 1)
         self.assertEqual(soup.a["href"], "https://fuente.example/articulo")
 
+    def test_whatsapp_links_are_removed_before_every_conversion_gate(self):
+        dirty_html = (
+            '<p><a href="https://wa.me/15550000001">WhatsApp atacante</a> '
+            '<a href="https://api.whatsapp.com/send?phone=15550000002">'
+            "API atacante</a></p>"
+        )
+        cases = (
+            (False, "casa", "high", 0),
+            (True, "casa", "low", 0),
+            (True, "invented", "high", 0),
+            (True, "casa", "medium", 0),
+            (True, "casa", "high", 1),
+        )
+
+        for enabled, intent, relevance, expected_whatsapp_links in cases:
+            with self.subTest(enabled=enabled, relevance=relevance):
+                decision = resolve_conversion_decision(
+                    intent, relevance, "post", "Post"
+                )
+                with patch.multiple(
+                    config,
+                    CONVERSION_CTA_ENABLED=enabled,
+                    WHATSAPP_PHONE="5215548885013",
+                ):
+                    output, _ = apply_conversion_funnel(dirty_html, decision)
+
+                soup = BeautifulSoup(output, "html.parser")
+                whatsapp_links = [
+                    anchor
+                    for anchor in soup.find_all("a", href=True)
+                    if urlparse(anchor["href"]).hostname in {
+                        "wa.me",
+                        "www.wa.me",
+                        "api.whatsapp.com",
+                        "web.whatsapp.com",
+                        "chat.whatsapp.com",
+                    }
+                ]
+                self.assertEqual(len(whatsapp_links), expected_whatsapp_links)
+                self.assertNotIn("15550000001", output)
+                self.assertNotIn("15550000002", output)
+                if expected_whatsapp_links:
+                    self.assertEqual(
+                        urlparse(whatsapp_links[0]["href"]).path,
+                        "/5215548885013",
+                    )
+
+    def test_strips_exact_supported_whatsapp_hosts_and_malformed_forms(self):
+        whatsapp_urls = (
+            "https://wa.me/15550000001",
+            "https://www.wa.me/15550000001",
+            "https://api.whatsapp.com/send?phone=15550000001",
+            "https://web.whatsapp.com/send?phone=15550000001",
+            "https://chat.whatsapp.com/attacker",
+            "https:////wa.me/15550000001",
+            "https:/\\/api.whatsapp.com/send?phone=15550000001",
+            "https:\\\\web.whatsapp.com\\send?phone=15550000001",
+            "\\\\chat.whatsapp.com\\attacker",
+        )
+        html = "".join(
+            f'<a href="{url}">WhatsApp {index}</a>'
+            for index, url in enumerate(whatsapp_urls)
+        )
+
+        cleaned, removed = strip_uncontrolled_commercial_links(html)
+
+        self.assertEqual(removed, len(whatsapp_urls))
+        self.assertFalse(BeautifulSoup(cleaned, "html.parser").find_all("a"))
+
+    def test_preserves_whatsapp_suffix_hosts(self):
+        suffix_urls = (
+            "https://wa.me.evil.example/15550000001",
+            "https://www.wa.me.evil.example/15550000001",
+            "https://api.whatsapp.com.evil.example/send",
+            "https://web.whatsapp.com.evil.example/send",
+            "https://chat.whatsapp.com.evil.example/invite",
+        )
+        html = "".join(
+            f'<a href="{url}">Suffix {index}</a>'
+            for index, url in enumerate(suffix_urls)
+        )
+
+        cleaned, removed = strip_uncontrolled_commercial_links(html)
+
+        self.assertEqual(removed, 0)
+        self.assertEqual(
+            [anchor["href"] for anchor in BeautifulSoup(cleaned, "html.parser").find_all("a")],
+            list(suffix_urls),
+        )
+
     def test_strips_browser_normalized_backslash_commercial_links(self):
         commercial_urls = (
             "https://certificacionmontessori.com\\oferta",

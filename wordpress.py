@@ -482,21 +482,35 @@ def list_recent_published_posts(limit: int = 6, exclude_ids: set[int] | None = N
             raise RecentPostsUnavailable(
                 "WordPress recent-post history has an invalid response shape"
             )
-        try:
-            post_id = int(item.get("id"))
-        except Exception:
-            continue
-        if post_id in exclude_ids:
-            continue
-        link = str(item.get("link", "")).strip()
-        title_data = item.get("title", {})
+        post_id = item.get("id")
+        link_value = item.get("link")
+        title_data = item.get("title")
+        if type(post_id) is not int or post_id <= 0:
+            raise RecentPostsUnavailable(
+                "WordPress recent-post history has an invalid response shape"
+            )
+        if not isinstance(link_value, str) or not link_value.strip():
+            raise RecentPostsUnavailable(
+                "WordPress recent-post history has an invalid response shape"
+            )
         if not isinstance(title_data, dict):
             raise RecentPostsUnavailable(
                 "WordPress recent-post history has an invalid response shape"
             )
-        raw_title = str(title_data.get("rendered", "")).strip()
+        rendered_title = title_data.get("rendered")
+        if not isinstance(rendered_title, str) or not rendered_title.strip():
+            raise RecentPostsUnavailable(
+                "WordPress recent-post history has an invalid response shape"
+            )
+
+        link = link_value.strip()
+        raw_title = rendered_title.strip()
         title = unescape(re.sub(r"<[^>]+>", "", raw_title)).strip()
-        if not link or not title:
+        if not title:
+            raise RecentPostsUnavailable(
+                "WordPress recent-post history has an invalid response shape"
+            )
+        if post_id in exclude_ids:
             continue
 
         image_url = ""
@@ -529,9 +543,7 @@ def list_recent_published_posts(limit: int = 6, exclude_ids: set[int] | None = N
                 "image_alt": image_alt,
             }
         )
-        if len(posts) >= limit:
-            break
-    return posts
+    return posts[:limit]
 
 
 def create_draft(

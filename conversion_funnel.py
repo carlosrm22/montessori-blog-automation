@@ -40,6 +40,15 @@ CONTEXT_COPY = (
 
 FUNNEL_MARKER_PREFIX = "ammac-training-"
 FUNNEL_MARKER_ATTRIBUTES = frozenset({"data-program-id", "data-cta-position"})
+WHATSAPP_NAVIGATION_HOSTS = frozenset(
+    {
+        "wa.me",
+        "www.wa.me",
+        "api.whatsapp.com",
+        "web.whatsapp.com",
+        "chat.whatsapp.com",
+    }
+)
 C0_AND_SPACE = "".join(chr(codepoint) for codepoint in range(0x21))
 SEMANTICALLY_UNSAFE_ELEMENTS = frozenset(
     {
@@ -186,7 +195,11 @@ def _malformed_authority_host(normalized_href: str) -> str | None:
 
 def _strip_uncontrolled_commercial_links(soup: BeautifulSoup) -> int:
     allowed_host = urlparse(config.CERTIFICATION_SITE_URL).hostname
-    commercial_hosts = {allowed_host, f"www.{allowed_host}"}
+    commercial_hosts = {
+        allowed_host,
+        f"www.{allowed_host}",
+        *WHATSAPP_NAVIGATION_HOSTS,
+    }
     removed = 0
     for anchor in soup.find_all("a", href=True):
         normalized_href = _normalize_special_url(str(anchor.get("href") or ""))
