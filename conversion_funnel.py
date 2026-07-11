@@ -38,6 +38,9 @@ CONTEXT_COPY = (
     ),
 )
 
+FUNNEL_MARKER_PREFIX = "ammac-training-"
+FUNNEL_MARKER_ATTRIBUTES = frozenset({"data-program-id", "data-cta-position"})
+
 
 @dataclass(frozen=True)
 class ConversionDecision:
@@ -191,6 +194,28 @@ def _is_valid_controlled_final_cta(section, decision: ConversionDecision) -> boo
     return str(section) == str(expected)
 
 
+def _is_funnel_marker(element) -> bool:
+    return (
+        any(
+            str(class_name).startswith(FUNNEL_MARKER_PREFIX)
+            for class_name in element.get("class", [])
+        )
+        or any(attribute in element.attrs for attribute in FUNNEL_MARKER_ATTRIBUTES)
+    )
+
+
+def _funnel_marker_elements(soup: BeautifulSoup):
+    return [element for element in soup.find_all(True) if _is_funnel_marker(element)]
+
+
+def _has_only_expected_funnel_markers(soup: BeautifulSoup, expected) -> bool:
+    marker_elements = _funnel_marker_elements(soup)
+    return len(marker_elements) == len(expected) and all(
+        any(marker is expected_marker for expected_marker in expected)
+        for marker in marker_elements
+    )
+
+
 def _has_valid_controlled_insertion(
     soup: BeautifulSoup,
     decision: ConversionDecision,
@@ -208,13 +233,20 @@ def _has_valid_controlled_insertion(
         return False
 
     if decision.cta_level == "medium":
-        return not cta_blocks
+        return not cta_blocks and _has_only_expected_funnel_markers(
+            soup, [contextual_blocks[0], contextual_links[0]]
+        )
 
-    return (
+    if not (
         len(cta_blocks) == 1
         and cta_blocks[0].name == "section"
         and _is_valid_controlled_final_cta(cta_blocks[0], decision)
-    )
+    ):
+        return False
+
+    expected = [contextual_blocks[0], contextual_links[0], cta_blocks[0]]
+    expected.extend(_funnel_marker_elements(cta_blocks[0]))
+    return _has_only_expected_funnel_markers(soup, expected)
 
 
 def _remove_marked_funnel_content(soup: BeautifulSoup) -> None:
@@ -222,13 +254,9 @@ def _remove_marked_funnel_content(soup: BeautifulSoup) -> None:
         if cta_block.parent is not None:
             cta_block.decompose()
 
-    for contextual_link in soup.select("a.ammac-training-link"):
-        if contextual_link.parent is not None:
-            contextual_link.unwrap()
-
-    for contextual_block in soup.select(".ammac-training-context"):
-        if contextual_block.parent is not None:
-            contextual_block.unwrap()
+    for element in reversed(_funnel_marker_elements(soup)):
+        if element.parent is not None:
+            element.unwrap()
 
 
 def apply_conversion_funnel(

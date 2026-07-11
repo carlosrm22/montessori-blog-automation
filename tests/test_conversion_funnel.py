@@ -151,6 +151,46 @@ class ConversionFunnelTests(unittest.TestCase):
         self.assertEqual(stats["contextual_links"], 1)
         self.assertEqual(stats["final_blocks"], 1)
 
+    def test_high_rebuilds_when_an_orphan_primary_cta_marker_is_present(self):
+        decision = resolve_conversion_decision(
+            "casa", "high", "ser-guia-casa", "C\u00f3mo ser Gu\u00eda de Casa"
+        )
+        orphan = (
+            '<aside><a class="ammac-training-cta-primary" '
+            'data-program-id="invented" data-cta-position="final" '
+            'href="https://attacker.example/primary">Oferta falsa</a></aside>'
+        )
+        with patch("config.CONVERSION_CTA_ENABLED", True):
+            inserted, _ = apply_conversion_funnel(ARTICLE, decision)
+            output, stats = apply_conversion_funnel(f"{inserted}{orphan}", decision)
+
+        soup = BeautifulSoup(output, "html.parser")
+        self.assertEqual(len(soup.select("section.ammac-training-cta")), 1)
+        self.assertEqual(len(soup.select("a.ammac-training-cta-primary")), 1)
+        self.assertNotIn("https://attacker.example/primary", output)
+        self.assertEqual(stats["contextual_links"], 1)
+        self.assertEqual(stats["final_blocks"], 1)
+
+    def test_medium_rebuilds_when_an_orphan_whatsapp_cta_marker_is_present(self):
+        decision = resolve_conversion_decision(
+            "casa", "medium", "observacion-casa", "Observaci\u00f3n en Casa"
+        )
+        orphan = (
+            '<div><a class="ammac-training-cta-whatsapp" '
+            'data-program-id="invented" data-cta-position="final_whatsapp" '
+            'href="https://attacker.example/whatsapp">WhatsApp falso</a></div>'
+        )
+        with patch("config.CONVERSION_CTA_ENABLED", True):
+            inserted, _ = apply_conversion_funnel(ARTICLE, decision)
+            output, stats = apply_conversion_funnel(f"{inserted}{orphan}", decision)
+
+        soup = BeautifulSoup(output, "html.parser")
+        self.assertEqual(len(soup.select("section.ammac-training-cta")), 0)
+        self.assertEqual(len(soup.select("a.ammac-training-cta-whatsapp")), 0)
+        self.assertNotIn("https://attacker.example/whatsapp", output)
+        self.assertEqual(stats["contextual_links"], 1)
+        self.assertEqual(stats["final_blocks"], 0)
+
     def test_low_relevance_changes_nothing_even_when_enabled(self):
         with patch("config.CONVERSION_CTA_ENABLED", True):
             decision = resolve_conversion_decision("casa", "low", "post", "Post")
