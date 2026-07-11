@@ -6,3 +6,6 @@ data/images/*.png
 logs/*.log
 __pycache__/
 *.pyc
+
+# Isolated feature worktrees
+.worktrees/
