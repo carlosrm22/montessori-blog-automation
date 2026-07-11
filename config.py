@@ -74,6 +74,25 @@ def validate() -> None:
     if PREFERRED_EXTERNAL_LINK_EVERY < 0:
         logging.critical("PREFERRED_EXTERNAL_LINK_EVERY no puede ser negativo")
         sys.exit(1)
+    parsed_certification = urlparse(CERTIFICATION_SITE_URL)
+    if (
+        parsed_certification.scheme != "https"
+        or parsed_certification.hostname != "certificacionmontessori.com"
+        or parsed_certification.username
+        or parsed_certification.password
+        or parsed_certification.port
+        or parsed_certification.path not in {"", "/"}
+        or parsed_certification.params
+        or parsed_certification.query
+        or parsed_certification.fragment
+    ):
+        logging.critical(
+            "CERTIFICATION_SITE_URL debe ser exactamente https://certificacionmontessori.com"
+        )
+        sys.exit(1)
+    if not WHATSAPP_PHONE.isdigit():
+        logging.critical("WHATSAPP_PHONE debe contener solo dígitos")
+        sys.exit(1)
     for external_url in PREFERRED_EXTERNAL_LINKS:
         parsed = urlparse(external_url)
         if parsed.scheme not in {"http", "https"} or not parsed.netloc:
@@ -155,6 +174,11 @@ GOOGLE_CSE_CX = os.environ.get("GOOGLE_CSE_CX", "")
 WP_SITE_URL = os.environ.get("WP_SITE_URL", "").rstrip("/")
 WP_USERNAME = os.environ.get("WP_USERNAME", "")
 WP_APP_PASSWORD = os.environ.get("WP_APP_PASSWORD", "")
+CONVERSION_CTA_ENABLED = os.environ.get("CONVERSION_CTA_ENABLED", "0") == "1"
+CERTIFICATION_SITE_URL = os.environ.get(
+    "CERTIFICATION_SITE_URL", "https://certificacionmontessori.com"
+).rstrip("/")
+WHATSAPP_PHONE = os.environ.get("WHATSAPP_PHONE", "5215548885013").strip()
 
 SEARCH_QUERIES = [
     q.strip()
