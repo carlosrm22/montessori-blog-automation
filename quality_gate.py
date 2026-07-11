@@ -48,9 +48,9 @@ def check_title_novelty(
 ) -> TitleQualityResult:
     best_score = 0.0
     best_title = ""
-    for title in existing_titles:
+    for index, title in enumerate(existing_titles):
         score = _similarity(candidate, title)
-        if score > best_score:
+        if index == 0 or score > best_score:
             best_score = score
             best_title = title
     return TitleQualityResult(best_score < threshold, best_score, best_title)

@@ -1,6 +1,7 @@
 """Carga y validación de variables de entorno."""
 
 import logging
+import math
 import os
 import sys
 from pathlib import Path
@@ -74,7 +75,7 @@ def validate() -> None:
     if QUALITY_RECENT_POSTS_COUNT < 1 or QUALITY_RECENT_POSTS_COUNT > 100:
         logging.critical("QUALITY_RECENT_POSTS_COUNT debe estar entre 1 y 100")
         sys.exit(1)
-    if TITLE_SIMILARITY_MAX <= 0 or TITLE_SIMILARITY_MAX >= 1:
+    if not math.isfinite(TITLE_SIMILARITY_MAX) or not 0 < TITLE_SIMILARITY_MAX < 1:
         logging.critical("TITLE_SIMILARITY_MAX debe ser mayor a 0 y menor a 1")
         sys.exit(1)
     if PREFERRED_EXTERNAL_LINK_EVERY < 0:
