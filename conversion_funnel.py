@@ -159,6 +159,31 @@ def _normalize_special_url(href: str) -> str:
     return normalized
 
 
+def _canonicalize_host(encoded_host: str) -> str:
+    host = unquote(encoded_host, errors="strict").lower()
+    return host[:-1] if host.endswith(".") else host
+
+
+def _malformed_authority_host(normalized_href: str) -> str | None:
+    lowered = normalized_href.lower()
+    if lowered.startswith("//"):
+        authority = normalized_href[2:]
+    elif lowered.startswith(("https://", "http://")):
+        authority = normalized_href[normalized_href.index(":") + 3 :]
+    else:
+        return None
+
+    authority = authority.split("/", 1)[0].split("?", 1)[0].split("#", 1)[0]
+    if authority.startswith("["):
+        authority = authority[1:]
+    if authority.endswith("]"):
+        authority = authority[:-1]
+    try:
+        return _canonicalize_host(authority)
+    except UnicodeError:
+        return None
+
+
 def _strip_uncontrolled_commercial_links(soup: BeautifulSoup) -> int:
     allowed_host = urlparse(config.CERTIFICATION_SITE_URL).hostname
     commercial_hosts = {allowed_host, f"www.{allowed_host}"}
@@ -167,15 +192,9 @@ def _strip_uncontrolled_commercial_links(soup: BeautifulSoup) -> int:
         normalized_href = _normalize_special_url(str(anchor.get("href") or ""))
         try:
             encoded_host = urlsplit(normalized_href).hostname
-            host = (
-                unquote(encoded_host, errors="strict").lower().rstrip(".")
-                if encoded_host is not None
-                else None
-            )
+            host = _canonicalize_host(encoded_host) if encoded_host is not None else None
         except (UnicodeError, ValueError):
-            anchor.unwrap()
-            removed += 1
-            continue
+            host = _malformed_authority_host(normalized_href)
         if host in commercial_hosts:
             anchor.unwrap()
             removed += 1

@@ -629,6 +629,39 @@ class ConversionFunnelTests(unittest.TestCase):
             list(unrelated_urls),
         )
 
+    def test_strips_one_trailing_root_dot_but_preserves_double_dot_host(self):
+        single_dot_url = "https://certificacionmontessori.com./oferta"
+        double_dot_url = "https://certificacionmontessori.com../oferta"
+        html = (
+            f'<a href="{single_dot_url}">Un punto</a>'
+            f'<a href="{double_dot_url}">Dos puntos</a>'
+        )
+
+        cleaned, removed = strip_uncontrolled_commercial_links(html)
+
+        soup = BeautifulSoup(cleaned, "html.parser")
+        self.assertEqual(removed, 1)
+        self.assertEqual([anchor["href"] for anchor in soup.find_all("a")], [double_dot_url])
+
+    def test_preserves_unrelated_bracket_malformed_links(self):
+        malformed_urls = (
+            "https://[example.com/path",
+            "https://example.com]/path",
+        )
+        html = "".join(
+            f'<a href="{url}">Link {index}</a>'
+            for index, url in enumerate(malformed_urls)
+        )
+
+        cleaned, removed = strip_uncontrolled_commercial_links(html)
+
+        soup = BeautifulSoup(cleaned, "html.parser")
+        self.assertEqual(removed, 0)
+        self.assertEqual(
+            [anchor["href"] for anchor in soup.find_all("a")],
+            list(malformed_urls),
+        )
+
     def test_strips_malformed_authority_conservatively(self):
         malformed_url = "https://[certificacionmontessori.com/oferta"
         html = f'<p><a href="{malformed_url}">Autoridad ambigua</a></p>'

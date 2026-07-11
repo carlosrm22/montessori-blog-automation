@@ -468,6 +468,84 @@ promotion, and changes remain limited to E3-owned files.
 
 No known implementation concerns.
 
+## E3 Exact-Host Hygiene Follow-Up
+
+### Root Cause
+
+Host canonicalization used `rstrip(".")`, which accepted any number of
+trailing DNS root dots. The parse-error path also unwrapped every link when
+`urlsplit()` or strict `unquote()` failed, including unrelated malformed
+authorities.
+
+### RED
+
+Added focused regressions for one trailing root dot versus two trailing dots,
+and for the observed unrelated bracket-malformed URLs:
+`https://[example.com/path` and `https://example.com]/path`. The existing
+browser-valid controlled-host regressions and the prior malformed controlled
+host regression remain in the focused suite.
+
+```bash
+python -m unittest tests.test_conversion_funnel -v
+```
+
+Result: failed as expected with 2 failures across 34 tests.
+
+- `test_strips_one_trailing_root_dot_but_preserves_double_dot_host` removed
+  both one-dot and two-dot hosts because `rstrip(".")` removed both dots.
+- `test_preserves_unrelated_bracket_malformed_links` removed both unrelated
+  links because every parse failure entered the unconditional unwrap branch.
+
+### GREEN
+
+Host canonicalization now removes at most one trailing dot. Parse failures
+now remain unchanged unless a conservative malformed-authority fallback can
+positively establish the exact controlled certification or `www` host; the
+prior malformed controlled-host cleanup remains active.
+
+```bash
+python -m unittest tests.test_conversion_funnel -v
+```
+
+Result: 34 tests passed, including all prior browser-valid controlled-host
+regressions and the new exact-host cases.
+
+### Final Verification
+
+```bash
+python -m unittest discover -v
+```
+
+Result: 40 tests passed.
+
+```bash
+python -m compileall -q .
+```
+
+Result: exited 0.
+
+```bash
+rg -n "api\.telegram\.org/bot[0-9]{6,}:[A-Za-z0-9_-]{20,}" .
+```
+
+Result: no matches; `rg` exited 1 as expected.
+
+```bash
+git diff --check
+```
+
+Result: exited 0.
+
+### Files Changed
+
+- `conversion_funnel.py`
+- `tests/test_conversion_funnel.py`
+- `.superpowers/sdd/E3-task-3-report.md`
+
+### Concerns
+
+No known implementation concerns.
+
 ## E3 Final Two Important Findings
 
 The approved normalize-then-rebuild architecture remains unchanged. URL host
