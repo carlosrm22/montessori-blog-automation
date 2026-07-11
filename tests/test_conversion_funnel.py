@@ -191,6 +191,67 @@ class ConversionFunnelTests(unittest.TestCase):
         self.assertEqual(stats["contextual_links"], 1)
         self.assertEqual(stats["final_blocks"], 0)
 
+    def test_high_removes_malformed_attribute_container_subtree(self):
+        decision = resolve_conversion_decision(
+            "casa", "high", "ser-guia-casa", "C\u00f3mo ser Gu\u00eda de Casa"
+        )
+        malformed = (
+            '<aside data-cta-position="final">Contenido falso '
+            '<a href="https://attacker.example/high">Oferta falsa</a></aside>'
+        )
+        with patch("config.CONVERSION_CTA_ENABLED", True):
+            output, stats = apply_conversion_funnel(f"{ARTICLE}{malformed}", decision)
+
+        soup = BeautifulSoup(output, "html.parser")
+        self.assertIsNone(soup.find("a", href="https://attacker.example/high"))
+        self.assertNotIn("Contenido falso", soup.get_text())
+        self.assertEqual(len(soup.select("a.ammac-training-link")), 1)
+        self.assertEqual(len(soup.select("section.ammac-training-cta")), 1)
+        self.assertEqual(stats["contextual_links"], 1)
+        self.assertEqual(stats["final_blocks"], 1)
+
+    def test_medium_removes_malformed_attribute_container_subtree(self):
+        decision = resolve_conversion_decision(
+            "casa", "medium", "observacion-casa", "Observaci\u00f3n en Casa"
+        )
+        malformed = (
+            '<div data-program-id="invented">Contenido falso '
+            '<a href="https://attacker.example/medium">Oferta falsa</a></div>'
+        )
+        with patch("config.CONVERSION_CTA_ENABLED", True):
+            output, stats = apply_conversion_funnel(f"{ARTICLE}{malformed}", decision)
+
+        soup = BeautifulSoup(output, "html.parser")
+        self.assertIsNone(soup.find("a", href="https://attacker.example/medium"))
+        self.assertNotIn("Contenido falso", soup.get_text())
+        self.assertEqual(len(soup.select("a.ammac-training-link")), 1)
+        self.assertEqual(len(soup.select("section.ammac-training-cta")), 0)
+        self.assertEqual(stats["contextual_links"], 1)
+        self.assertEqual(stats["final_blocks"], 0)
+
+    def test_removes_unknown_marker_class_container_subtree(self):
+        decision = resolve_conversion_decision(
+            "casa", "medium", "observacion-casa", "Observaci\u00f3n en Casa"
+        )
+        malformed = (
+            '<nav class="ammac-training-invented">Navegaci\u00f3n falsa '
+            '<a href="https://attacker.example/unknown">Oferta falsa</a></nav>'
+        )
+        with patch("config.CONVERSION_CTA_ENABLED", True):
+            output, _ = apply_conversion_funnel(f"{ARTICLE}{malformed}", decision)
+
+        soup = BeautifulSoup(output, "html.parser")
+        self.assertIsNone(soup.find("a", href="https://attacker.example/unknown"))
+        self.assertNotIn("Navegaci\u00f3n falsa", soup.get_text())
+        self.assertFalse(
+            any(
+                class_name.startswith("ammac-training-")
+                for element in soup.find_all(True)
+                for class_name in element.get("class", [])
+                if class_name not in {"ammac-training-context", "ammac-training-link"}
+            )
+        )
+
     def test_low_relevance_changes_nothing_even_when_enabled(self):
         with patch("config.CONVERSION_CTA_ENABLED", True):
             decision = resolve_conversion_decision("casa", "low", "post", "Post")

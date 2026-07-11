@@ -6,7 +6,7 @@ import hashlib
 from dataclasses import dataclass
 from urllib.parse import urlencode, urlparse
 
-from bs4 import BeautifulSoup
+from bs4 import BeautifulSoup, NavigableString
 
 import config
 
@@ -250,13 +250,21 @@ def _has_valid_controlled_insertion(
 
 
 def _remove_marked_funnel_content(soup: BeautifulSoup) -> None:
-    for cta_block in soup.select(".ammac-training-cta"):
-        if cta_block.parent is not None:
-            cta_block.decompose()
+    marked_elements = _funnel_marker_elements(soup)
+    marked_non_anchors = {
+        id(element) for element in marked_elements if element.name != "a"
+    }
 
-    for element in reversed(_funnel_marker_elements(soup)):
-        if element.parent is not None:
-            element.unwrap()
+    for element in marked_elements:
+        if element.name == "a" or element.parent is None:
+            continue
+        if any(id(parent) in marked_non_anchors for parent in element.parents):
+            continue
+        element.decompose()
+
+    for element in marked_elements:
+        if element.name == "a" and element.parent is not None:
+            element.replace_with(NavigableString(element.get_text()))
 
 
 def apply_conversion_funnel(
