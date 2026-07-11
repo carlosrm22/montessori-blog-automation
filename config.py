@@ -298,20 +298,30 @@ INTERNAL_LINKS = [
 
 
 def setup_logging() -> None:
-    LOG_DIR.mkdir(parents=True, exist_ok=True)
     from logging.handlers import RotatingFileHandler
+    from logging_security import RedactingFormatter
 
-    handler = RotatingFileHandler(
+    LOG_DIR.mkdir(parents=True, exist_ok=True)
+    formatter = RedactingFormatter(
+        "%(asctime)s [%(levelname)s] %(name)s: %(message)s"
+    )
+    file_handler = RotatingFileHandler(
         LOG_DIR / "automation.log",
         maxBytes=5 * 1024 * 1024,
         backupCount=3,
         encoding="utf-8",
     )
-    logging.basicConfig(
-        level=logging.INFO,
-        format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
-        handlers=[handler, logging.StreamHandler()],
-    )
+    stream_handler = logging.StreamHandler()
+    file_handler.setFormatter(formatter)
+    stream_handler.setFormatter(formatter)
+
+    root = logging.getLogger()
+    root.handlers.clear()
+    root.setLevel(logging.INFO)
+    root.addHandler(file_handler)
+    root.addHandler(stream_handler)
+    logging.getLogger("httpx").setLevel(logging.WARNING)
+    logging.getLogger("httpcore").setLevel(logging.WARNING)
 
 
 if __name__ == "__main__":

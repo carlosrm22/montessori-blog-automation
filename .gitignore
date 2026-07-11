@@ -3,7 +3,7 @@
 data/blog_state.db
 data/images/*.jpg
 data/images/*.png
-logs/*.log
+logs/
 __pycache__/
 *.pyc
 
