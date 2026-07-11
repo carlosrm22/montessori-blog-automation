@@ -6,6 +6,7 @@ from bs4 import BeautifulSoup
 
 import config
 from conversion_funnel import (
+    ConversionDecision,
     apply_conversion_funnel,
     resolve_conversion_decision,
     strip_uncontrolled_commercial_links,
@@ -89,6 +90,65 @@ class ConversionFunnelTests(unittest.TestCase):
         self.assertEqual(len(soup.select("a.ammac-training-link")), 1)
         self.assertEqual(len(soup.select("section.ammac-training-cta")), 1)
         self.assertEqual(len(soup.select("section.ammac-training-cta a")), 2)
+
+    def test_forged_high_decision_is_rebuilt_from_classifier_fields(self):
+        forged = ConversionDecision(
+            intent="casa",
+            relevance="high",
+            program_id="attacker-program",
+            destination_path="/attacker-route/",
+            destination_url="https://attacker.example/destination",
+            attributed_url="https://attacker.example/tracked",
+            label="Attacker label",
+            post_slug="canonical-post",
+            post_title="Canonical Post",
+            cta_level="high",
+        )
+        canonical = resolve_conversion_decision(
+            forged.intent, forged.relevance, forged.post_slug, forged.post_title
+        )
+
+        with patch("config.CONVERSION_CTA_ENABLED", True):
+            output, stats = apply_conversion_funnel(ARTICLE, forged)
+
+        soup = BeautifulSoup(output, "html.parser")
+        commercial_links = soup.select(
+            "a.ammac-training-link, a.ammac-training-cta-primary"
+        )
+        self.assertEqual(len(commercial_links), 2)
+        self.assertTrue(
+            all(link["href"] == canonical.attributed_url for link in commercial_links)
+        )
+        self.assertTrue(
+            all(link["data-program-id"] == "casa" for link in commercial_links)
+        )
+        query = parse_qs(urlparse(commercial_links[0]["href"]).query)
+        self.assertEqual(query["utm_content"], ["canonical-post"])
+        self.assertEqual(query["utm_term"], ["casa"])
+        self.assertIn("Casa de Niños", soup.get_text())
+        self.assertNotIn("attacker", output.lower())
+        self.assertEqual(stats["cta_level"], "high")
+
+    def test_forged_invalid_decision_fails_closed(self):
+        forged = ConversionDecision(
+            intent="invented",
+            relevance="high",
+            program_id="attacker-program",
+            destination_path="/attacker-route/",
+            destination_url="https://attacker.example/destination",
+            attributed_url="https://attacker.example/tracked",
+            label="Attacker label",
+            post_slug="post",
+            post_title="Post",
+            cta_level="high",
+        )
+
+        with patch("config.CONVERSION_CTA_ENABLED", True):
+            output, stats = apply_conversion_funnel(ARTICLE, forged)
+
+        self.assertEqual(output, ARTICLE)
+        self.assertEqual(stats["cta_level"], "none")
+        self.assertNotIn("ammac-training-", output)
 
     def test_high_rebuilds_spoofed_and_duplicate_markers(self):
         decision = resolve_conversion_decision(
@@ -230,6 +290,24 @@ class ConversionFunnelTests(unittest.TestCase):
         contextual = soup.select_one("p.ammac-training-context")
         self.assertEqual(contextual.find_previous_sibling("p")["id"], "visible")
 
+    def test_contextual_insertion_rejects_css_comment_obfuscation(self):
+        decision = resolve_conversion_decision(
+            "casa", "medium", "observacion-casa", "Observación en Casa"
+        )
+        html = (
+            '<div id="styled-hidden" style="display:/**/none">'
+            '<p id="hidden-one">Oculto uno</p><p id="hidden-two">Oculto dos</p>'
+            '</div><p id="visible">Visible</p>'
+        )
+
+        with patch("config.CONVERSION_CTA_ENABLED", True):
+            output, _ = apply_conversion_funnel(html, decision)
+
+        soup = BeautifulSoup(output, "html.parser")
+        contextual = soup.select_one("p.ammac-training-context")
+        self.assertIsNone(contextual.find_parent(id="styled-hidden"))
+        self.assertEqual(contextual.find_previous_sibling("p")["id"], "visible")
+
     def test_contextual_insertion_uses_safe_root_fallback(self):
         decision = resolve_conversion_decision(
             "casa", "medium", "observacion-casa", "Observaci\u00f3n en Casa"
@@ -241,6 +319,9 @@ class ConversionFunnelTests(unittest.TestCase):
 
         soup = BeautifulSoup(output, "html.parser")
         contextual = soup.select_one("p.ammac-training-context")
+        self.assertIs(contextual.parent, soup)
+        self.assertIsNone(soup.html)
+        self.assertIsNone(soup.body)
         self.assertFalse(
             any(
                 ancestor.has_attr("hidden") or ancestor.has_attr("inert")
@@ -288,12 +369,12 @@ class ConversionFunnelTests(unittest.TestCase):
         self.assertEqual(stats["contextual_links"], 1)
         self.assertEqual(stats["final_blocks"], 0)
 
-    def test_high_removes_malformed_attribute_container_subtree(self):
+    def test_high_removes_malformed_marked_attribute_container_subtree(self):
         decision = resolve_conversion_decision(
             "casa", "high", "ser-guia-casa", "C\u00f3mo ser Gu\u00eda de Casa"
         )
         malformed = (
-            '<aside data-cta-position="final">Contenido falso '
+            '<aside class="ammac-training-malformed" data-cta-position="final">Contenido falso '
             '<a href="https://attacker.example/high">Oferta falsa</a></aside>'
         )
         with patch("config.CONVERSION_CTA_ENABLED", True):
@@ -307,12 +388,12 @@ class ConversionFunnelTests(unittest.TestCase):
         self.assertEqual(stats["contextual_links"], 1)
         self.assertEqual(stats["final_blocks"], 1)
 
-    def test_medium_removes_malformed_attribute_container_subtree(self):
+    def test_medium_removes_malformed_marked_attribute_container_subtree(self):
         decision = resolve_conversion_decision(
             "casa", "medium", "observacion-casa", "Observaci\u00f3n en Casa"
         )
         malformed = (
-            '<div data-program-id="invented">Contenido falso '
+            '<div class="ammac-training-malformed" data-program-id="invented">Contenido falso '
             '<a href="https://attacker.example/medium">Oferta falsa</a></div>'
         )
         with patch("config.CONVERSION_CTA_ENABLED", True):
@@ -408,6 +489,27 @@ class ConversionFunnelTests(unittest.TestCase):
                 self.assertEqual(stats["contextual_links"], 0)
                 self.assertEqual(stats["final_blocks"], 0)
 
+    def test_disabled_hygiene_preserves_attribute_only_article_root(self):
+        decision = resolve_conversion_decision("casa", "high", "post", "Post")
+        html = (
+            '<article id="editorial" data-program-id="invented" '
+            'data-cta-position="final"><h2>Contenido editorial</h2>'
+            '<p><a href="https://fuente.example/articulo">Fuente normal</a></p>'
+            "</article>"
+        )
+
+        with patch("config.CONVERSION_CTA_ENABLED", False):
+            output, stats = apply_conversion_funnel(html, decision)
+
+        soup = BeautifulSoup(output, "html.parser")
+        article = soup.find("article", id="editorial")
+        self.assertIsNotNone(article)
+        self.assertFalse(article.has_attr("data-program-id"))
+        self.assertFalse(article.has_attr("data-cta-position"))
+        self.assertEqual(article.h2.get_text(), "Contenido editorial")
+        self.assertEqual(article.a["href"], "https://fuente.example/articulo")
+        self.assertEqual(stats["cta_level"], "none")
+
     def test_strips_only_uncontrolled_commercial_links(self):
         html = (
             '<p><a href="https://certificacionmontessori.com/inventado/">Inventado</a> '
@@ -418,6 +520,44 @@ class ConversionFunnelTests(unittest.TestCase):
         self.assertEqual(removed, 1)
         self.assertEqual(len(soup.select("a")), 1)
         self.assertEqual(soup.a["href"], "https://fuente.example/articulo")
+
+    def test_strips_browser_normalized_backslash_commercial_links(self):
+        commercial_urls = (
+            "https://certificacionmontessori.com\\oferta",
+            "https://www.certificacionmontessori.com\\oferta",
+            "//certificacionmontessori.com\\oferta",
+            "//www.certificacionmontessori.com\\oferta",
+            "\\\\certificacionmontessori.com\\oferta",
+            "\\\\www.certificacionmontessori.com\\oferta",
+        )
+        unrelated_urls = (
+            "https://certificacionmontessori.com.evil.example\\oferta",
+            "//certificacionmontessori.com.evil.example\\oferta",
+        )
+        html = "".join(
+            f'<a href="{url}">Link {index}</a>'
+            for index, url in enumerate((*commercial_urls, *unrelated_urls))
+        )
+
+        cleaned, removed = strip_uncontrolled_commercial_links(html)
+
+        soup = BeautifulSoup(cleaned, "html.parser")
+        self.assertEqual(removed, len(commercial_urls))
+        self.assertEqual(
+            [anchor["href"] for anchor in soup.find_all("a")],
+            list(unrelated_urls),
+        )
+
+    def test_strips_malformed_authority_conservatively(self):
+        malformed_url = "https://[certificacionmontessori.com/oferta"
+        html = f'<p><a href="{malformed_url}">Autoridad ambigua</a></p>'
+
+        cleaned, removed = strip_uncontrolled_commercial_links(html)
+
+        soup = BeautifulSoup(cleaned, "html.parser")
+        self.assertEqual(removed, 1)
+        self.assertIsNone(soup.a)
+        self.assertIn("Autoridad ambigua", soup.get_text())
 
     def test_validate_rejects_noncanonical_certification_origins(self):
         invalid_origins = (

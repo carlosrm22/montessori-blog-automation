@@ -133,10 +133,13 @@ def _strip_uncontrolled_commercial_links(soup: BeautifulSoup) -> int:
     allowed_host = urlparse(config.CERTIFICATION_SITE_URL).hostname
     removed = 0
     for anchor in soup.find_all("a", href=True):
+        normalized_href = str(anchor.get("href") or "").strip().replace("\\", "/")
         try:
-            host = urlparse(str(anchor.get("href") or "").strip()).hostname
+            host = urlparse(normalized_href).hostname
         except ValueError:
-            host = None
+            anchor.unwrap()
+            removed += 1
+            continue
         if host in {allowed_host, f"www.{allowed_host}"}:
             anchor.unwrap()
             removed += 1
@@ -186,16 +189,19 @@ def _final_cta(soup: BeautifulSoup, decision: ConversionDecision):
 
 
 def _is_funnel_marker(element) -> bool:
-    return (
-        any(
-            str(class_name).startswith(FUNNEL_MARKER_PREFIX)
-            for class_name in element.get("class", [])
-        )
-        or any(attribute in element.attrs for attribute in FUNNEL_MARKER_ATTRIBUTES)
+    return any(
+        str(class_name).startswith(FUNNEL_MARKER_PREFIX)
+        for class_name in element.get("class", [])
     )
 
 
 def _normalize_existing_funnel_content(soup: BeautifulSoup) -> None:
+    for element in soup.find_all(True):
+        if _is_funnel_marker(element):
+            continue
+        for attribute in FUNNEL_MARKER_ATTRIBUTES:
+            element.attrs.pop(attribute, None)
+
     marked_elements = [
         element for element in soup.find_all(True) if _is_funnel_marker(element)
     ]
@@ -241,18 +247,7 @@ def _is_hidden(element) -> bool:
         return True
     if str(attributes.get("aria-hidden", "")).strip().lower() == "true":
         return True
-
-    for declaration in str(attributes.get("style", "")).split(";"):
-        property_name, separator, value = declaration.partition(":")
-        if not separator:
-            continue
-        property_name = property_name.strip().lower()
-        value = value.split("!important", 1)[0].strip().lower()
-        if (property_name == "display" and value == "none") or (
-            property_name == "visibility" and value == "hidden"
-        ):
-            return True
-    return False
+    return bool(str(attributes.get("style", "")).strip())
 
 
 def _is_safe_insertion_target(element) -> bool:
@@ -268,14 +263,27 @@ def _safe_root(soup: BeautifulSoup):
     return soup
 
 
+def _canonicalize_decision(decision: ConversionDecision) -> ConversionDecision:
+    try:
+        return resolve_conversion_decision(
+            decision.intent,
+            decision.relevance,
+            decision.post_slug,
+            decision.post_title,
+        )
+    except Exception:
+        return resolve_conversion_decision("", "", "", "")
+
+
 def apply_conversion_funnel(
     html: str,
     decision: ConversionDecision,
 ) -> tuple[str, dict[str, object]]:
     soup = BeautifulSoup(html or "", "html.parser")
     _normalize_existing_funnel_content(soup)
+    canonical_decision = _canonicalize_decision(decision)
 
-    if not config.CONVERSION_CTA_ENABLED or decision.cta_level not in {
+    if not config.CONVERSION_CTA_ENABLED or canonical_decision.cta_level not in {
         "medium",
         "high",
     }:
@@ -285,7 +293,7 @@ def apply_conversion_funnel(
             "final_blocks": 0,
         }
 
-    contextual = _contextual_paragraph(soup, decision)
+    contextual = _contextual_paragraph(soup, canonical_decision)
     paragraphs = [
         paragraph
         for paragraph in soup.find_all("p")
@@ -299,12 +307,12 @@ def apply_conversion_funnel(
         _safe_root(soup).insert(0, contextual)
 
     final_blocks = 0
-    if decision.cta_level == "high":
-        _safe_root(soup).append(_final_cta(soup, decision))
+    if canonical_decision.cta_level == "high":
+        _safe_root(soup).append(_final_cta(soup, canonical_decision))
         final_blocks = 1
 
     return str(soup), {
-        "cta_level": decision.cta_level,
+        "cta_level": canonical_decision.cta_level,
         "contextual_links": 1,
         "final_blocks": final_blocks,
     }
