@@ -4,6 +4,7 @@ from urllib.parse import parse_qs, urlparse
 
 from bs4 import BeautifulSoup
 
+import config
 from conversion_funnel import (
     apply_conversion_funnel,
     resolve_conversion_decision,
@@ -15,6 +16,39 @@ ARTICLE = "<p>Introducción editorial.</p><p>Casa de Niños y observación.</p><
 
 
 class ConversionFunnelTests(unittest.TestCase):
+    def _assert_invalid_certification_origin(self, origin):
+        with patch("config._get_required"), patch.multiple(
+            config,
+            SEARCH_PROVIDER="brave",
+            BRAVE_SEARCH_COUNT=1,
+            WP_IMAGE_WIDTH=1200,
+            WP_IMAGE_HEIGHT=630,
+            WP_IMAGE_QUALITY=90,
+            MIN_BODY_WORDS=600,
+            SOURCE_FETCH_MAX_CHARS=15000,
+            LINK_CHECK_TIMEOUT=8,
+            RECENT_POSTS_GALLERY_COUNT=4,
+            PREFERRED_EXTERNAL_LINK_EVERY=3,
+            WHATSAPP_PHONE="5215548885013",
+            PREFERRED_EXTERNAL_LINKS=(),
+            TOPICS_MAX_POSTS_PER_RUN=1,
+            MIN_DRAFT_BUFFER=0,
+            MAX_DRAFT_BACKLOG=0,
+            PUBLISH_INTERVAL_DAYS=7,
+            TRUSEO_MIN_SCORE=70,
+            HEADLINE_MIN_SCORE=65,
+            POST_TITLE_MAX_LEN=60,
+            SOCIAL_TITLE_MAX_LEN=60,
+            SOCIAL_DESCRIPTION_MAX_LEN=155,
+            FOCUS_KEYPHRASE_MAX_WORDS=5,
+            SITE_TITLE="Asociaci\u00f3n Montessori de M\u00e9xico",
+            TITLE_SEPARATOR="|",
+            BRAND_KIT="ammac",
+            CERTIFICATION_SITE_URL=origin,
+        ):
+            with self.assertRaises(SystemExit):
+                config.validate()
+
     def test_routes_only_known_intent_with_attribution(self):
         decision = resolve_conversion_decision(
             "casa", "medium", "observacion-casa", "Observación en Casa"
@@ -56,6 +90,67 @@ class ConversionFunnelTests(unittest.TestCase):
         self.assertEqual(len(soup.select("section.ammac-training-cta")), 1)
         self.assertEqual(len(soup.select("section.ammac-training-cta a")), 2)
 
+    def test_high_rebuilds_spoofed_and_duplicate_markers(self):
+        decision = resolve_conversion_decision(
+            "casa", "high", "ser-guia-casa", "C\u00f3mo ser Gu\u00eda de Casa"
+        )
+        html = (
+            '<p>Introducci\u00f3n editorial.</p><p>Casa de Ni\u00f1os.</p>'
+            '<a class="ammac-training-link" data-program-id="invented" '
+            'data-cta-position="contextual" href="https://attacker.example">Spoof</a>'
+            '<a class="ammac-training-link" data-program-id="casa" '
+            'data-cta-position="contextual" href="https://certificacionmontessori.com/wrong">Duplicado</a>'
+            '<section class="ammac-training-cta"><a href="https://attacker.example">CTA falsa</a></section>'
+            '<section class="ammac-training-cta"><a href="https://attacker.example">CTA falsa 2</a></section>'
+        )
+        with patch("config.CONVERSION_CTA_ENABLED", True):
+            output, stats = apply_conversion_funnel(html, decision)
+        soup = BeautifulSoup(output, "html.parser")
+        links = soup.select("a.ammac-training-link")
+        final_blocks = soup.select("section.ammac-training-cta")
+
+        self.assertEqual(len(links), 1)
+        self.assertEqual(links[0]["href"], decision.attributed_url)
+        self.assertEqual(links[0]["data-program-id"], decision.program_id)
+        self.assertEqual(links[0]["data-cta-position"], "contextual")
+        self.assertEqual(len(final_blocks), 1)
+        self.assertEqual(len(final_blocks[0].select("a")), 2)
+        self.assertEqual(stats["contextual_links"], 1)
+        self.assertEqual(stats["final_blocks"], 1)
+
+    def test_medium_removes_injected_final_cta_and_rebuilds_contextual_link(self):
+        decision = resolve_conversion_decision(
+            "casa", "medium", "observacion-casa", "Observaci\u00f3n en Casa"
+        )
+        html = (
+            '<p>Introducci\u00f3n editorial.</p><p>Casa de Ni\u00f1os.</p>'
+            '<a class="ammac-training-link" data-program-id="invented" '
+            'data-cta-position="contextual" href="https://attacker.example">Spoof</a>'
+            '<section class="ammac-training-cta"><a href="https://attacker.example">CTA falsa</a></section>'
+        )
+        with patch("config.CONVERSION_CTA_ENABLED", True):
+            output, stats = apply_conversion_funnel(html, decision)
+        soup = BeautifulSoup(output, "html.parser")
+        links = soup.select("a.ammac-training-link")
+
+        self.assertEqual(len(links), 1)
+        self.assertEqual(links[0]["href"], decision.attributed_url)
+        self.assertEqual(len(soup.select("section.ammac-training-cta")), 0)
+        self.assertEqual(stats["contextual_links"], 1)
+        self.assertEqual(stats["final_blocks"], 0)
+
+    def test_valid_controlled_insertion_is_idempotent(self):
+        decision = resolve_conversion_decision(
+            "casa", "high", "ser-guia-casa", "C\u00f3mo ser Gu\u00eda de Casa"
+        )
+        with patch("config.CONVERSION_CTA_ENABLED", True):
+            inserted, _ = apply_conversion_funnel(ARTICLE, decision)
+            output, stats = apply_conversion_funnel(inserted, decision)
+
+        self.assertEqual(output, inserted)
+        self.assertEqual(stats["contextual_links"], 1)
+        self.assertEqual(stats["final_blocks"], 1)
+
     def test_low_relevance_changes_nothing_even_when_enabled(self):
         with patch("config.CONVERSION_CTA_ENABLED", True):
             decision = resolve_conversion_decision("casa", "low", "post", "Post")
@@ -87,6 +182,21 @@ class ConversionFunnelTests(unittest.TestCase):
         self.assertEqual(removed, 1)
         self.assertEqual(len(soup.select("a")), 1)
         self.assertEqual(soup.a["href"], "https://fuente.example/articulo")
+
+    def test_validate_rejects_noncanonical_certification_origins(self):
+        invalid_origins = (
+            "https://@certificacionmontessori.com",
+            "https://user@certificacionmontessori.com",
+            "https://certificacionmontessori.com:443",
+            "https://certificacionmontessori.com:",
+            "https://certificacionmontessori.com:not-a-port",
+            "https://certificacionmontessori.com/path",
+            "https://certificacionmontessori.com?query=value",
+            "https://certificacionmontessori.com#fragment",
+        )
+        for origin in invalid_origins:
+            with self.subTest(origin=origin):
+                self._assert_invalid_certification_origin(origin)
 
 
 if __name__ == "__main__":

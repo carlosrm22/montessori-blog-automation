@@ -177,6 +177,60 @@ def _final_cta(soup: BeautifulSoup, decision: ConversionDecision):
     return section
 
 
+def _is_valid_controlled_contextual_link(
+    soup: BeautifulSoup,
+    link,
+    decision: ConversionDecision,
+) -> bool:
+    expected = _contextual_paragraph(BeautifulSoup("", "html.parser"), decision)
+    return link.parent is not None and str(link.parent) == str(expected)
+
+
+def _is_valid_controlled_final_cta(section, decision: ConversionDecision) -> bool:
+    expected = _final_cta(BeautifulSoup("", "html.parser"), decision)
+    return str(section) == str(expected)
+
+
+def _has_valid_controlled_insertion(
+    soup: BeautifulSoup,
+    decision: ConversionDecision,
+) -> bool:
+    contextual_links = soup.select("a.ammac-training-link")
+    contextual_blocks = soup.select(".ammac-training-context")
+    cta_blocks = soup.select(".ammac-training-cta")
+
+    if (
+        len(contextual_links) != 1
+        or len(contextual_blocks) != 1
+        or contextual_links[0].parent is not contextual_blocks[0]
+        or not _is_valid_controlled_contextual_link(soup, contextual_links[0], decision)
+    ):
+        return False
+
+    if decision.cta_level == "medium":
+        return not cta_blocks
+
+    return (
+        len(cta_blocks) == 1
+        and cta_blocks[0].name == "section"
+        and _is_valid_controlled_final_cta(cta_blocks[0], decision)
+    )
+
+
+def _remove_marked_funnel_content(soup: BeautifulSoup) -> None:
+    for cta_block in soup.select(".ammac-training-cta"):
+        if cta_block.parent is not None:
+            cta_block.decompose()
+
+    for contextual_link in soup.select("a.ammac-training-link"):
+        if contextual_link.parent is not None:
+            contextual_link.unwrap()
+
+    for contextual_block in soup.select(".ammac-training-context"):
+        if contextual_block.parent is not None:
+            contextual_block.unwrap()
+
+
 def apply_conversion_funnel(
     html: str,
     decision: ConversionDecision,
@@ -185,12 +239,14 @@ def apply_conversion_funnel(
         return html, {"cta_level": "none", "contextual_links": 0, "final_blocks": 0}
 
     soup = BeautifulSoup(html or "", "html.parser")
-    if soup.select_one(".ammac-training-link, .ammac-training-cta"):
+    if _has_valid_controlled_insertion(soup, decision):
         return str(soup), {
             "cta_level": decision.cta_level,
-            "contextual_links": len(soup.select("a.ammac-training-link")),
-            "final_blocks": len(soup.select("section.ammac-training-cta")),
+            "contextual_links": 1,
+            "final_blocks": 1 if decision.cta_level == "high" else 0,
         }
+
+    _remove_marked_funnel_content(soup)
 
     contextual = _contextual_paragraph(soup, decision)
     paragraphs = soup.find_all("p")

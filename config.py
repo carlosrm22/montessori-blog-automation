@@ -74,13 +74,21 @@ def validate() -> None:
     if PREFERRED_EXTERNAL_LINK_EVERY < 0:
         logging.critical("PREFERRED_EXTERNAL_LINK_EVERY no puede ser negativo")
         sys.exit(1)
-    parsed_certification = urlparse(CERTIFICATION_SITE_URL)
+    try:
+        parsed_certification = urlparse(CERTIFICATION_SITE_URL)
+        certification_port = parsed_certification.port
+    except ValueError:
+        parsed_certification = None
+        certification_port = None
     if (
-        parsed_certification.scheme != "https"
+        CERTIFICATION_SITE_URL != "https://certificacionmontessori.com"
+        or parsed_certification is None
+        or parsed_certification.scheme != "https"
+        or parsed_certification.netloc != "certificacionmontessori.com"
         or parsed_certification.hostname != "certificacionmontessori.com"
         or parsed_certification.username
         or parsed_certification.password
-        or parsed_certification.port
+        or certification_port
         or parsed_certification.path not in {"", "/"}
         or parsed_certification.params
         or parsed_certification.query
