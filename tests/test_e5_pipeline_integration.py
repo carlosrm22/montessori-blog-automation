@@ -1,3 +1,4 @@
+import hashlib
 import inspect
 import unittest
 from contextlib import ExitStack
@@ -129,6 +130,9 @@ class E5PipelineIntegrationTests(unittest.TestCase):
             {"title": "Cuidado del ambiente", "url": "https://blog.test/5"},
         ]
         expected_slug = build_post_slug(post)
+        expected_content_id = (
+            "post_" + hashlib.sha256(expected_slug.encode("utf-8")).hexdigest()[:16]
+        )
         events = []
 
         def strip_body(html):
@@ -148,7 +152,10 @@ class E5PipelineIntegrationTests(unittest.TestCase):
         def apply_funnel(html, decision):
             events.append("apply")
             self.assertEqual(decision.post_slug, expected_slug)
-            self.assertIn(f"utm_content={expected_slug}", decision.attributed_url)
+            self.assertIn(
+                f"utm_content={expected_content_id}", decision.attributed_url
+            )
+            self.assertNotIn(expected_slug, decision.attributed_url)
             self.assertTrue(html.endswith("|sanitized"))
             return f"{html}|funnel", {}
 
@@ -274,6 +281,9 @@ class E5PipelineIntegrationTests(unittest.TestCase):
             {"title": "Botánica en el aula", "url": "https://blog.test/7"},
         ]
         expected_slug = build_post_slug(post)
+        expected_content_id = (
+            "post_" + hashlib.sha256(expected_slug.encode("utf-8")).hexdigest()[:16]
+        )
         events = []
 
         def strip_body(html):
@@ -293,7 +303,10 @@ class E5PipelineIntegrationTests(unittest.TestCase):
         def apply_funnel(html, decision):
             events.append("apply")
             self.assertEqual(decision.post_slug, expected_slug)
-            self.assertIn(f"utm_content={expected_slug}", decision.attributed_url)
+            self.assertIn(
+                f"utm_content={expected_content_id}", decision.attributed_url
+            )
+            self.assertNotIn(expected_slug, decision.attributed_url)
             self.assertTrue(html.endswith("|sanitized"))
             return f"{html}|funnel", {}
 

@@ -1,3 +1,4 @@
+import re
 import unittest
 from unittest.mock import patch
 from urllib.parse import parse_qs, urlparse
@@ -5,6 +6,7 @@ from urllib.parse import parse_qs, urlparse
 from bs4 import BeautifulSoup
 
 import config
+import conversion_funnel
 from conversion_funnel import (
     ConversionDecision,
     apply_conversion_funnel,
@@ -50,17 +52,40 @@ class ConversionFunnelTests(unittest.TestCase):
             with self.assertRaises(SystemExit):
                 config.validate()
 
-    def test_routes_only_known_intent_with_attribution(self):
+    def test_build_source_content_id_is_deterministic_opaque_and_utf8_safe(self):
+        self.assertTrue(hasattr(conversion_funnel, "build_source_content_id"))
+        build_source_content_id = conversion_funnel.build_source_content_id
+
+        self.assertEqual(
+            build_source_content_id("observacion-casa"),
+            "post_d95119f319861cea",
+        )
+        self.assertEqual(
+            build_source_content_id("educación-cósmica-niñez"),
+            "post_d191cb7ee061dd65",
+        )
+        self.assertEqual(
+            build_source_content_id("observacion-casa"),
+            build_source_content_id("observacion-casa"),
+        )
+        self.assertIsNotNone(
+            re.fullmatch(r"post_[0-9a-f]{16}", build_source_content_id("ser-guia"))
+        )
+
+    def test_routes_only_known_intent_with_opaque_attribution(self):
+        raw_slug = "observacion-casa"
         decision = resolve_conversion_decision(
-            "casa", "medium", "observacion-casa", "Observación en Casa"
+            "casa", "medium", raw_slug, "Observación en Casa"
         )
         self.assertEqual(decision.destination_path, "/diplomados/casa-de-ninos/")
+        self.assertEqual(decision.post_slug, raw_slug)
         query = parse_qs(urlparse(decision.attributed_url).query)
         self.assertEqual(query["utm_source"], ["montessorimexico.org"])
         self.assertEqual(query["utm_medium"], ["referral"])
         self.assertEqual(query["utm_campaign"], ["guia_montessori"])
-        self.assertEqual(query["utm_content"], ["observacion-casa"])
+        self.assertEqual(query["utm_content"], ["post_d95119f319861cea"])
         self.assertEqual(query["utm_term"], ["casa"])
+        self.assertNotIn(raw_slug, decision.attributed_url)
 
     def test_general_training_routes_to_the_hub(self):
         decision = resolve_conversion_decision(
@@ -123,7 +148,7 @@ class ConversionFunnelTests(unittest.TestCase):
             all(link["data-program-id"] == "casa" for link in commercial_links)
         )
         query = parse_qs(urlparse(commercial_links[0]["href"]).query)
-        self.assertEqual(query["utm_content"], ["canonical-post"])
+        self.assertEqual(query["utm_content"], ["post_5f9f0d1ccdc2b47c"])
         self.assertEqual(query["utm_term"], ["casa"])
         self.assertIn("Casa de Niños", soup.get_text())
         self.assertNotIn("attacker", output.lower())

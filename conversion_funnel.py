@@ -79,6 +79,11 @@ class ConversionDecision:
     cta_level: str
 
 
+def build_source_content_id(post_slug: str) -> str:
+    digest = hashlib.sha256(post_slug.encode("utf-8")).hexdigest()
+    return f"post_{digest[:16]}"
+
+
 def resolve_conversion_decision(
     intent: str,
     relevance: str,
@@ -109,7 +114,7 @@ def resolve_conversion_decision(
             "utm_source": "montessorimexico.org",
             "utm_medium": "referral",
             "utm_campaign": "guia_montessori",
-            "utm_content": post_slug,
+            "utm_content": build_source_content_id(post_slug),
             "utm_term": clean_intent,
         }
     )
