@@ -71,6 +71,12 @@ def validate() -> None:
     if RECENT_POSTS_GALLERY_COUNT < 0:
         logging.critical("RECENT_POSTS_GALLERY_COUNT no puede ser negativo")
         sys.exit(1)
+    if QUALITY_RECENT_POSTS_COUNT < 1 or QUALITY_RECENT_POSTS_COUNT > 100:
+        logging.critical("QUALITY_RECENT_POSTS_COUNT debe estar entre 1 y 100")
+        sys.exit(1)
+    if TITLE_SIMILARITY_MAX <= 0 or TITLE_SIMILARITY_MAX >= 1:
+        logging.critical("TITLE_SIMILARITY_MAX debe ser mayor a 0 y menor a 1")
+        sys.exit(1)
     if PREFERRED_EXTERNAL_LINK_EVERY < 0:
         logging.critical("PREFERRED_EXTERNAL_LINK_EVERY no puede ser negativo")
         sys.exit(1)
@@ -289,6 +295,8 @@ SOURCE_FETCH_MAX_CHARS = int(os.environ.get("SOURCE_FETCH_MAX_CHARS", "15000"))
 LINK_VALIDATION_ENABLED = os.environ.get("LINK_VALIDATION_ENABLED", "1") == "1"
 LINK_CHECK_TIMEOUT = int(os.environ.get("LINK_CHECK_TIMEOUT", "8"))
 RECENT_POSTS_GALLERY_COUNT = int(os.environ.get("RECENT_POSTS_GALLERY_COUNT", "4"))
+QUALITY_RECENT_POSTS_COUNT = int(os.environ.get("QUALITY_RECENT_POSTS_COUNT", "30"))
+TITLE_SIMILARITY_MAX = float(os.environ.get("TITLE_SIMILARITY_MAX", "0.82"))
 PREFERRED_EXTERNAL_LINK_EVERY = int(os.environ.get("PREFERRED_EXTERNAL_LINK_EVERY", "3"))
 PREFERRED_EXTERNAL_LINKS = [
     u.strip()
