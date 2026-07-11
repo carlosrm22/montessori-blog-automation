@@ -142,6 +142,10 @@ def _slugify(value: str) -> str:
     return slug[:90]
 
 
+def build_post_slug(post: GeneratedPost) -> str:
+    return _slugify(post.title)
+
+
 def _truncate(text: str, max_len: int) -> str:
     text = " ".join((text or "").split())
     if len(text) <= max_len:
@@ -491,7 +495,7 @@ def create_draft(
         "status": "draft",
         "categories": category_ids,
         "tags": tag_ids,
-        "slug": _slugify(post.seo_title or post.title),
+        "slug": build_post_slug(post),
     }
     if media_id:
         payload["featured_media"] = media_id

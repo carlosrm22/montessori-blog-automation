@@ -3,6 +3,7 @@
 import logging
 import sys
 from datetime import datetime, timedelta, timezone
+from urllib.parse import urlparse
 
 import config
 import state
@@ -11,6 +12,7 @@ from scorer import select_best
 from content import generate_post
 from image_gen import generate_cover_image
 from wordpress import (
+    build_post_slug,
     upload_media,
     create_draft,
     list_recent_published_posts,
@@ -18,9 +20,15 @@ from wordpress import (
 )
 from source_fetch import enrich_article
 from topics import TopicProfile, load_topics
-from seo_rules import analyze_headline, analyze_truseo, build_slug
+from seo_rules import analyze_headline, analyze_truseo
 from notifier import notify_draft_created
 from link_optimizer import sanitize_and_enrich_body
+from conversion_funnel import (
+    apply_conversion_funnel,
+    resolve_conversion_decision,
+    strip_uncontrolled_commercial_links,
+)
+from quality_gate import check_title_novelty
 
 logger = logging.getLogger(__name__)
 
@@ -104,8 +112,12 @@ def _rotate_topics(topics: list[TopicProfile]) -> list[TopicProfile]:
     return rotated
 
 
-def _pick_preferred_external_url() -> str:
-    links = [url for url in config.PREFERRED_EXTERNAL_LINKS if url]
+def _pick_preferred_external_url(excluded_hosts: set[str] | None = None) -> str:
+    excluded = {host.lower() for host in (excluded_hosts or set())}
+    links = [
+        url for url in config.PREFERRED_EXTERNAL_LINKS
+        if url and (urlparse(url).netloc or "").lower() not in excluded
+    ]
     every = config.PREFERRED_EXTERNAL_LINK_EVERY
     if not links or every <= 0:
         return ""
@@ -165,10 +177,47 @@ def run_topic_pipeline(topic: TopicProfile) -> bool:
     if topic.categories:
         post.categories = topic.categories
 
-    recent_posts: list[dict] = []
-    if config.RECENT_POSTS_GALLERY_COUNT > 0:
-        recent_posts = list_recent_published_posts(limit=config.RECENT_POSTS_GALLERY_COUNT)
-    preferred_external_url = _pick_preferred_external_url()
+    recent_for_quality = list_recent_published_posts(
+        limit=config.QUALITY_RECENT_POSTS_COUNT
+    )
+    quality = check_title_novelty(
+        post.title,
+        [item.get("title", "") for item in recent_for_quality],
+        config.TITLE_SIMILARITY_MAX,
+    )
+    if not quality.accepted:
+        logger.warning(
+            "Quality gate: título demasiado similar (%.3f) a '%s'",
+            quality.highest_similarity,
+            quality.matched_title,
+        )
+        state.mark_processed(
+            article.url,
+            title=post.title,
+            score=score,
+            status="quality_failed",
+            topic_id=topic.topic_id,
+        )
+        return False
+
+    post_slug = build_post_slug(post)
+    decision = resolve_conversion_decision(
+        post.conversion_intent,
+        post.commercial_relevance,
+        post_slug,
+        post.title,
+    )
+    post.body, stripped_commercial_links = strip_uncontrolled_commercial_links(post.body)
+    logger.info(
+        "Higiene comercial [%s]: enlaces no controlados eliminados=%d",
+        topic.topic_id,
+        stripped_commercial_links,
+    )
+
+    recent_posts = recent_for_quality[:config.RECENT_POSTS_GALLERY_COUNT]
+    certification_host = (urlparse(config.CERTIFICATION_SITE_URL).netloc or "").lower()
+    excluded_hosts = {certification_host} if decision.destination_path else set()
+    preferred_external_url = _pick_preferred_external_url(excluded_hosts)
     post.body, link_stats = sanitize_and_enrich_body(
         html=post.body,
         source_url=article.url,
@@ -188,6 +237,16 @@ def run_topic_pipeline(topic: TopicProfile) -> bool:
         preferred_external_url or "none",
         link_stats.get("preferred_external_added", False),
     )
+    post.body, conversion_stats = apply_conversion_funnel(post.body, decision)
+    logger.info(
+        "Conversión [%s]: intent=%s relevance=%s destination=%s stats=%s enabled=%s",
+        topic.topic_id,
+        decision.intent,
+        decision.relevance,
+        decision.destination_path or "none",
+        conversion_stats,
+        config.CONVERSION_CTA_ENABLED,
+    )
 
     # 3.5 Local SEO gate (TruSEO-like + Headline) without AIOSEO API.
     truseo_score = None
@@ -198,7 +257,7 @@ def run_topic_pipeline(topic: TopicProfile) -> bool:
             post_title=post.title,
             seo_title=post.seo_title,
             meta_description=post.seo_description,
-            slug=build_slug(post.seo_title or post.title),
+            slug=post_slug,
             focus_keyphrase=post.focus_keyphrase,
             site_domain=config.WP_SITE_DOMAIN,
             og_title=post.og_title,
@@ -311,6 +370,9 @@ def run_topic_pipeline(topic: TopicProfile) -> bool:
         edit_url=f"{config.WP_SITE_URL}/wp-admin/post.php?post={post_id}&action=edit",
         truseo_score=truseo_score,
         headline_score=headline_score,
+        conversion_intent=decision.intent,
+        commercial_relevance=decision.relevance,
+        destination_url=decision.destination_url,
     )
     logger.info("=== Pipeline completado: borrador #%d creado ===", post_id)
     return True

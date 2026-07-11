@@ -96,6 +96,11 @@ Variables principales:
 - `LINK_VALIDATION_ENABLED`: valida enlaces HTTP antes de publicar (`1` por defecto).
 - `LINK_CHECK_TIMEOUT`: timeout (segundos) para validar cada URL (default `8`).
 - `RECENT_POSTS_GALLERY_COUNT`: número de posts publicados reales a insertar en la galería final (default `4`, `0` = deshabilitar).
+- `QUALITY_RECENT_POSTS_COUNT`: títulos recientes de WordPress comparados por el gate de novedad (default `30`).
+- `TITLE_SIMILARITY_MAX`: similitud máxima aceptada antes de rechazar el borrador (default `0.82`).
+- `CONVERSION_CTA_ENABLED`: `0` mantiene clasificación y logs activos sin insertar CTA controlados; la higiene comercial todavía elimina destinos redactados por el modelo. Cambia a `1` solo después de comprobar que todas las URLs de programas responden con HTTP 200.
+- `CERTIFICATION_SITE_URL`: origen HTTPS canónico para las rutas controladas de programas.
+- `WHATSAPP_PHONE`: solo los dígitos del WhatsApp institucional, sin `+` ni espacios.
 - `PREFERRED_EXTERNAL_LINK_EVERY`: inserta un enlace externo recomendado cada N publicaciones (default `3`, `0` = deshabilitar).
 - `PREFERRED_EXTERNAL_LINKS`: lista de dominios externos recomendados separados por coma (rotación automática).
 - `WP_IMAGE_WIDTH` / `WP_IMAGE_HEIGHT`: dimensiones objetivo de portada.
@@ -103,6 +108,21 @@ Variables principales:
 - `WP_IMAGE_MAX_KB`: peso objetivo máximo de imagen.
 - `SOURCE_FETCH_ENABLED`: habilita extracción del texto real de la fuente antes de redactar.
 - `SOURCE_FETCH_MAX_CHARS`: máximo de caracteres extraídos desde la nota origen.
+
+### Enrutamiento de conversión
+
+El clasificador solo acepta los siguientes intents. Cualquier otro valor, o relevancia `low`, se normaliza a `editorial / low` sin destino comercial.
+
+| Intent | Ruta controlada |
+| --- | --- |
+| `nido` | `/diplomados/nido-comunidad-infantil/` |
+| `casa` | `/diplomados/casa-de-ninos/` |
+| `taller` | `/diplomados/taller-i-ii/` |
+| `cosmica` | `/diplomados/educacion-cosmica/` |
+| `neuro` | `/diplomados/neuroeducacion/` |
+| `general_training` | `/diplomados/` |
+
+Con relevancia `medium` se genera un enlace contextual controlado. Con `high`, también se genera el bloque final y el enlace institucional de WhatsApp. La inserción solo ocurre con `CONVERSION_CTA_ENABLED=1`; antes de aplicar el embudo, ambos pipelines eliminan enlaces comerciales redactados por el modelo.
 
 ## Topics.yml
 
@@ -245,6 +265,7 @@ La programación queda diaria a las `08:00` y `Persistent=true` hace que, si la 
 - Se actualizan `alt_text`, `caption` y `description` de la imagen destacada para accesibilidad.
 - El scoring penaliza páginas evergreen (home/about/wiki) y prioriza contenido más noticioso/reciente.
 - El SEO gate local calcula `TruSEO-like` y `Headline score`; si no pasan umbral se marca `seo_failed` y no publica.
+- El gate de novedad compara el título editorial con publicaciones recientes antes de generar la portada o escribir en WordPress.
 - Se exige `title` corto (<=60), focus keyphrase en meta description, al menos un enlace interno y metadatos sociales OG/X.
 - `seo_title`, `og_title` y `twitter_title` se normalizan al formato `Título | Sitio` (configurable).
 - La portada aplica `brand kit` (prompt + color grading) para consistencia visual por marca.
@@ -256,6 +277,7 @@ La programación queda diaria a las `08:00` y `Persistent=true` hace que, si la 
 - El enfoque editorial es internacional por defecto; se añade contexto local solo cuando realmente aporta.
 - El orden de publicación rota automáticamente por `topic_id` tomando como referencia el último borrador publicado.
 - Cuando se crea un borrador, el sistema puede enviar una notificación con título, autor, puntajes SEO y enlace directo de edición.
+- Los dos pipelines crean únicamente posts con estado `draft`; la creación de borradores no publica el post ni llama a IndexNow.
 
 ## Licencia
 

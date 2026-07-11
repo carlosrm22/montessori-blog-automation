@@ -25,12 +25,23 @@ import config
 import cuadernillo_source as cs
 import state
 from content import generate_post
+from conversion_funnel import (
+    apply_conversion_funnel,
+    resolve_conversion_decision,
+    strip_uncontrolled_commercial_links,
+)
 from image_gen import generate_cover_image
 from link_optimizer import sanitize_and_enrich_body
 from notifier import notify_draft_created
+from quality_gate import check_title_novelty
 from search import SearchResult
-from seo_rules import analyze_headline, analyze_truseo, build_slug
-from wordpress import create_draft, list_recent_published_posts, upload_media
+from seo_rules import analyze_headline, analyze_truseo
+from wordpress import (
+    build_post_slug,
+    create_draft,
+    list_recent_published_posts,
+    upload_media,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -76,13 +87,54 @@ def _process_one(item: cs.Cuadernillo, dry_run: bool) -> bool:
 
     post.categories = item.categories or post.categories
 
-    # Higiene de enlaces (sin source_url; añade internos a partir de posts recientes)
-    recent_posts: list[dict] = []
-    gallery_n = getattr(config, "RECENT_POSTS_GALLERY_COUNT", 0)
-    if gallery_n and not dry_run:
-        recent_posts = list_recent_published_posts(limit=gallery_n)
+    recent_for_quality = list_recent_published_posts(
+        limit=config.QUALITY_RECENT_POSTS_COUNT
+    )
+    quality = check_title_novelty(
+        post.title,
+        [recent.get("title", "") for recent in recent_for_quality],
+        config.TITLE_SIMILARITY_MAX,
+    )
+    if not quality.accepted:
+        logger.warning(
+            "Quality gate cuadernillo: título demasiado similar (%.3f) a '%s'",
+            quality.highest_similarity,
+            quality.matched_title,
+        )
+        if not dry_run:
+            state.mark_processed(
+                item.pseudo_url,
+                title=post.title,
+                status="cuad_quality_failed",
+                topic_id=item.topic_id,
+            )
+        return False
+
+    post_slug = build_post_slug(post)
+    decision = resolve_conversion_decision(
+        post.conversion_intent,
+        post.commercial_relevance,
+        post_slug,
+        post.title,
+    )
+    post.body, stripped_commercial_links = strip_uncontrolled_commercial_links(post.body)
+    logger.info(
+        "Higiene comercial cuadernillo: enlaces no controlados eliminados=%d",
+        stripped_commercial_links,
+    )
+
+    recent_posts = recent_for_quality[:config.RECENT_POSTS_GALLERY_COUNT]
     post.body, _ = sanitize_and_enrich_body(
         html=post.body, source_url="", recent_posts=recent_posts,
+    )
+    post.body, conversion_stats = apply_conversion_funnel(post.body, decision)
+    logger.info(
+        "Conversión cuadernillo: intent=%s relevance=%s destination=%s stats=%s enabled=%s",
+        decision.intent,
+        decision.relevance,
+        decision.destination_path or "none",
+        conversion_stats,
+        config.CONVERSION_CTA_ENABLED,
     )
 
     # SEO local: se calcula y registra (NO se usa como filtro: queremos cubrir todo).
@@ -91,7 +143,7 @@ def _process_one(item: cs.Cuadernillo, dry_run: bool) -> bool:
         truseo = analyze_truseo(
             html=post.body, post_title=post.title, seo_title=post.seo_title,
             meta_description=post.seo_description,
-            slug=build_slug(post.seo_title or post.title),
+            slug=post_slug,
             focus_keyphrase=post.focus_keyphrase, site_domain=config.WP_SITE_DOMAIN,
             og_title=post.og_title, og_description=post.og_description,
             twitter_title=post.twitter_title, twitter_description=post.twitter_description,
@@ -144,6 +196,9 @@ def _process_one(item: cs.Cuadernillo, dry_run: bool) -> bool:
         author_name=item.author_name,
         edit_url=f"{config.WP_SITE_URL}/wp-admin/post.php?post={post_id}&action=edit",
         truseo_score=truseo_score, headline_score=headline_score,
+        conversion_intent=decision.intent,
+        commercial_relevance=decision.relevance,
+        destination_url=decision.destination_url,
     )
     logger.info("=== Cuadernillo publicado como borrador #%d ===", post_id)
     return True
