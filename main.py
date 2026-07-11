@@ -12,6 +12,7 @@ from scorer import select_best
 from content import generate_post
 from image_gen import generate_cover_image
 from wordpress import (
+    RecentPostsUnavailable,
     build_post_slug,
     upload_media,
     create_draft,
@@ -177,12 +178,29 @@ def run_topic_pipeline(topic: TopicProfile) -> bool:
     if topic.categories:
         post.categories = topic.categories
 
-    recent_for_quality = list_recent_published_posts(
-        limit=config.QUALITY_RECENT_POSTS_COUNT
+    recent_limit = max(
+        config.QUALITY_RECENT_POSTS_COUNT,
+        config.RECENT_POSTS_GALLERY_COUNT,
     )
+    try:
+        recent_posts = list_recent_published_posts(limit=recent_limit)
+    except RecentPostsUnavailable:
+        logger.warning(
+            "Quality gate unavailable: recent WordPress history could not be loaded"
+        )
+        state.mark_processed(
+            article.url,
+            title=post.title,
+            score=score,
+            status="quality_history_unavailable",
+            topic_id=topic.topic_id,
+        )
+        return False
+
+    recent_titles = recent_posts[:config.QUALITY_RECENT_POSTS_COUNT]
     quality = check_title_novelty(
         post.title,
-        [item.get("title", "") for item in recent_for_quality],
+        [item.get("title", "") for item in recent_titles],
         config.TITLE_SIMILARITY_MAX,
     )
     if not quality.accepted:
@@ -214,14 +232,14 @@ def run_topic_pipeline(topic: TopicProfile) -> bool:
         stripped_commercial_links,
     )
 
-    recent_posts = recent_for_quality[:config.RECENT_POSTS_GALLERY_COUNT]
+    recent_gallery = recent_posts[:config.RECENT_POSTS_GALLERY_COUNT]
     certification_host = (urlparse(config.CERTIFICATION_SITE_URL).netloc or "").lower()
     excluded_hosts = {certification_host} if decision.destination_path else set()
     preferred_external_url = _pick_preferred_external_url(excluded_hosts)
     post.body, link_stats = sanitize_and_enrich_body(
         html=post.body,
         source_url=article.url,
-        recent_posts=recent_posts,
+        recent_posts=recent_gallery,
         preferred_external_url=preferred_external_url,
     )
     logger.info(

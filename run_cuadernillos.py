@@ -37,6 +37,7 @@ from quality_gate import check_title_novelty
 from search import SearchResult
 from seo_rules import analyze_headline, analyze_truseo
 from wordpress import (
+    RecentPostsUnavailable,
     build_post_slug,
     create_draft,
     list_recent_published_posts,
@@ -87,12 +88,30 @@ def _process_one(item: cs.Cuadernillo, dry_run: bool) -> bool:
 
     post.categories = item.categories or post.categories
 
-    recent_for_quality = list_recent_published_posts(
-        limit=config.QUALITY_RECENT_POSTS_COUNT
+    recent_limit = max(
+        config.QUALITY_RECENT_POSTS_COUNT,
+        config.RECENT_POSTS_GALLERY_COUNT,
     )
+    try:
+        recent_posts = list_recent_published_posts(limit=recent_limit)
+    except RecentPostsUnavailable:
+        logger.warning(
+            "Quality gate cuadernillo unavailable: recent WordPress history "
+            "could not be loaded"
+        )
+        if not dry_run:
+            state.mark_processed(
+                item.pseudo_url,
+                title=post.title,
+                status="cuad_quality_history_unavailable",
+                topic_id=item.topic_id,
+            )
+        return False
+
+    recent_titles = recent_posts[:config.QUALITY_RECENT_POSTS_COUNT]
     quality = check_title_novelty(
         post.title,
-        [recent.get("title", "") for recent in recent_for_quality],
+        [recent.get("title", "") for recent in recent_titles],
         config.TITLE_SIMILARITY_MAX,
     )
     if not quality.accepted:
@@ -123,9 +142,9 @@ def _process_one(item: cs.Cuadernillo, dry_run: bool) -> bool:
         stripped_commercial_links,
     )
 
-    recent_posts = recent_for_quality[:config.RECENT_POSTS_GALLERY_COUNT]
+    recent_gallery = recent_posts[:config.RECENT_POSTS_GALLERY_COUNT]
     post.body, _ = sanitize_and_enrich_body(
-        html=post.body, source_url="", recent_posts=recent_posts,
+        html=post.body, source_url="", recent_posts=recent_gallery,
     )
     post.body, conversion_stats = apply_conversion_funnel(post.body, decision)
     logger.info(

@@ -24,6 +24,10 @@ _SG_CHALLENGE_RE = re.compile(r'const sgchallenge="([^"]+)";')
 _SG_SUBMIT_RE = re.compile(r'const sgsubmit_url="([^"]+)";')
 
 
+class RecentPostsUnavailable(RuntimeError):
+    """Raised when WordPress recent-post history cannot be trusted."""
+
+
 def _int_to_min_be(value: int) -> bytes:
     if value <= 0xFF:
         return bytes([value])
@@ -92,7 +96,7 @@ def _try_solve_sgcaptcha(client: httpx.Client, endpoint_url: str, resp: httpx.Re
         except Exception:
             return False
         if challenge_resp.status_code >= 400:
-            logger.warning("No se pudo abrir challenge sgcaptcha para %s", endpoint_url)
+            logger.warning("No se pudo abrir challenge sgcaptcha de WordPress")
             return False
     challenge_html = challenge_resp.text or ""
     challenge_match = _SG_CHALLENGE_RE.search(challenge_html)
@@ -105,7 +109,7 @@ def _try_solve_sgcaptcha(client: httpx.Client, endpoint_url: str, resp: httpx.Re
     start_from = random.randint(0, 40_000_000)
     solved = _solve_sgchallenge(challenge, start=start_from)
     if not solved:
-        logger.warning("No se pudo resolver sgcaptcha para %s", endpoint_url)
+        logger.warning("No se pudo resolver sgcaptcha de WordPress")
         return False
     solution, hashes, elapsed = solved
     sep = "&" if "?" in submit_url else "?"
@@ -117,9 +121,9 @@ def _try_solve_sgcaptcha(client: httpx.Client, endpoint_url: str, resp: httpx.Re
 
     verify = client.get(endpoint_url)
     if _is_sgcaptcha_html(verify):
-        logger.warning("sgcaptcha persistió para %s", endpoint_url)
+        logger.warning("sgcaptcha persistió en WordPress")
         return False
-    logger.info("sgcaptcha resuelto para %s (hashes=%d)", endpoint_url, hashes)
+    logger.info("sgcaptcha resuelto en WordPress (hashes=%d)", hashes)
     return True
 
 
@@ -172,7 +176,7 @@ def _request(
                 if solved:
                     resp = getattr(client, method)(url, **kwargs)
             if _is_sgcaptcha_html(resp):
-                logger.error("WordPress blocked by sgcaptcha: %s %s", method.upper(), url)
+                logger.error("WordPress blocked by sgcaptcha: method=%s", method.upper())
                 return None
             if resp.status_code == 401:
                 logger.error("WordPress auth failed (401). Check credentials.")
@@ -184,10 +188,19 @@ def _request(
             resp.raise_for_status()
             return resp
         except httpx.HTTPStatusError as exc:
-            logger.error("WordPress API error: %s %s -> %s", method.upper(), url, exc)
+            logger.error(
+                "WordPress API request failed: method=%s error=%s status=%s",
+                method.upper(),
+                type(exc).__name__,
+                exc.response.status_code,
+            )
             return None
         except httpx.RequestError as exc:
-            logger.error("WordPress request failed: %s", exc)
+            logger.error(
+                "WordPress API request failed: method=%s error=%s",
+                method.upper(),
+                type(exc).__name__,
+            )
             return None
 
 
@@ -206,10 +219,19 @@ def _aioseo_request(
             resp.raise_for_status()
             return resp
         except httpx.HTTPStatusError as exc:
-            logger.warning("AIOSEO API error: %s %s -> %s", method.upper(), url, exc)
+            logger.warning(
+                "AIOSEO API request failed: method=%s error=%s status=%s",
+                method.upper(),
+                type(exc).__name__,
+                exc.response.status_code,
+            )
             return None
         except httpx.RequestError as exc:
-            logger.warning("AIOSEO request failed: %s", exc)
+            logger.warning(
+                "AIOSEO API request failed: method=%s error=%s",
+                method.upper(),
+                type(exc).__name__,
+            )
             return None
 
 
@@ -431,7 +453,7 @@ def list_recent_published_posts(limit: int = 6, exclude_ids: set[int] | None = N
     if limit <= 0:
         return []
     exclude_ids = exclude_ids or set()
-    per_page = max(1, min(limit * 3, 30))
+    per_page = max(1, min(limit, 100))
     params = {
         "status": "publish",
         "orderby": "date",
@@ -440,11 +462,26 @@ def list_recent_published_posts(limit: int = 6, exclude_ids: set[int] | None = N
         "_embed": "wp:featuredmedia",
     }
     resp = _request("get", "posts", params=params, retry_on_500=False)
-    if not resp:
-        return []
+    if resp is None:
+        raise RecentPostsUnavailable("WordPress recent-post history is unavailable")
+
+    try:
+        payload = resp.json()
+    except Exception:
+        raise RecentPostsUnavailable(
+            "WordPress recent-post history could not be parsed"
+        ) from None
+    if not isinstance(payload, list):
+        raise RecentPostsUnavailable(
+            "WordPress recent-post history has an invalid response shape"
+        )
 
     posts: list[dict] = []
-    for item in resp.json():
+    for item in payload:
+        if not isinstance(item, dict):
+            raise RecentPostsUnavailable(
+                "WordPress recent-post history has an invalid response shape"
+            )
         try:
             post_id = int(item.get("id"))
         except Exception:
@@ -452,7 +489,12 @@ def list_recent_published_posts(limit: int = 6, exclude_ids: set[int] | None = N
         if post_id in exclude_ids:
             continue
         link = str(item.get("link", "")).strip()
-        raw_title = str(item.get("title", {}).get("rendered", "")).strip()
+        title_data = item.get("title", {})
+        if not isinstance(title_data, dict):
+            raise RecentPostsUnavailable(
+                "WordPress recent-post history has an invalid response shape"
+            )
+        raw_title = str(title_data.get("rendered", "")).strip()
         title = unescape(re.sub(r"<[^>]+>", "", raw_title)).strip()
         if not link or not title:
             continue
@@ -460,9 +502,21 @@ def list_recent_published_posts(limit: int = 6, exclude_ids: set[int] | None = N
         image_url = ""
         image_alt = ""
         embedded = item.get("_embedded", {})
-        media_list = embedded.get("wp:featuredmedia", []) if isinstance(embedded, dict) else []
-        if isinstance(media_list, list) and media_list:
+        if not isinstance(embedded, dict):
+            raise RecentPostsUnavailable(
+                "WordPress recent-post history has an invalid response shape"
+            )
+        media_list = embedded.get("wp:featuredmedia", [])
+        if not isinstance(media_list, list):
+            raise RecentPostsUnavailable(
+                "WordPress recent-post history has an invalid response shape"
+            )
+        if media_list:
             media = media_list[0] or {}
+            if not isinstance(media, dict):
+                raise RecentPostsUnavailable(
+                    "WordPress recent-post history has an invalid response shape"
+                )
             image_url = str(media.get("source_url", "")).strip()
             image_alt = str(media.get("alt_text", "")).strip()
 

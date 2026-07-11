@@ -12,9 +12,10 @@ import run_cuadernillos
 from content import GeneratedPost
 from conversion_funnel import resolve_conversion_decision
 from cuadernillo_source import Cuadernillo
+from quality_gate import check_title_novelty
 from search import SearchResult
 from topics import TopicProfile
-from wordpress import build_post_slug
+from wordpress import RecentPostsUnavailable, build_post_slug
 
 
 def _post() -> GeneratedPost:
@@ -75,11 +76,11 @@ def _score_report():
     return SimpleNamespace(score=90, to_dict=lambda: {"score": 90})
 
 
-def _config_patch():
+def _config_patch(quality_count=6, gallery_count=2):
     return patch.multiple(
         config,
-        QUALITY_RECENT_POSTS_COUNT=6,
-        RECENT_POSTS_GALLERY_COUNT=2,
+        QUALITY_RECENT_POSTS_COUNT=quality_count,
+        RECENT_POSTS_GALLERY_COUNT=gallery_count,
         TITLE_SIMILARITY_MAX=0.82,
         CERTIFICATION_SITE_URL="https://certificacionmontessori.com",
         CONVERSION_CTA_ENABLED=True,
@@ -112,6 +113,8 @@ class E5PipelineIntegrationTests(unittest.TestCase):
             {"title": "Matemáticas con materiales", "url": "https://blog.test/1"},
             {"title": "El ambiente preparado", "url": "https://blog.test/2"},
             {"title": "Lenguaje y movimiento", "url": "https://blog.test/3"},
+            {"title": "Geografía para la infancia", "url": "https://blog.test/4"},
+            {"title": "Cuidado del ambiente", "url": "https://blog.test/5"},
         ]
         expected_slug = build_post_slug(post)
         events = []
@@ -122,9 +125,13 @@ class E5PipelineIntegrationTests(unittest.TestCase):
 
         def sanitize_body(**kwargs):
             events.append("sanitize")
-            self.assertEqual(kwargs["recent_posts"], recent[:2])
+            self.assertEqual(kwargs["recent_posts"], recent[:4])
             self.assertTrue(kwargs["html"].endswith("|stripped"))
             return f'{kwargs["html"]}|sanitized', {}
+
+        def evaluate_quality(title, recent_titles, threshold):
+            self.assertEqual(recent_titles, [item["title"] for item in recent[:2]])
+            return check_title_novelty(title, recent_titles, threshold)
 
         def apply_funnel(html, decision):
             events.append("apply")
@@ -147,7 +154,7 @@ class E5PipelineIntegrationTests(unittest.TestCase):
             return False
 
         with ExitStack() as stack:
-            stack.enter_context(_config_patch())
+            stack.enter_context(_config_patch(quality_count=2, gallery_count=4))
             dotenv = stack.enter_context(patch("dotenv.load_dotenv"))
             stack.enter_context(patch.object(main, "search_all", return_value=[article]))
             stack.enter_context(
@@ -157,6 +164,11 @@ class E5PipelineIntegrationTests(unittest.TestCase):
             stack.enter_context(patch.object(main, "generate_post", return_value=post))
             recent_fetch = stack.enter_context(
                 patch.object(main, "list_recent_published_posts", return_value=recent)
+            )
+            stack.enter_context(
+                patch.object(
+                    main, "check_title_novelty", side_effect=evaluate_quality
+                )
             )
             decision = stack.enter_context(
                 patch.object(
@@ -217,7 +229,7 @@ class E5PipelineIntegrationTests(unittest.TestCase):
 
         self.assertTrue(result)
         dotenv.assert_not_called()
-        recent_fetch.assert_called_once_with(limit=6)
+        recent_fetch.assert_called_once_with(limit=4)
         decision.assert_called_once_with(
             "casa", "medium", expected_slug, post.title
         )
@@ -244,6 +256,10 @@ class E5PipelineIntegrationTests(unittest.TestCase):
             {"title": "Matemáticas con materiales", "url": "https://blog.test/1"},
             {"title": "El ambiente preparado", "url": "https://blog.test/2"},
             {"title": "Lenguaje y movimiento", "url": "https://blog.test/3"},
+            {"title": "Geografía para la infancia", "url": "https://blog.test/4"},
+            {"title": "Cuidado del ambiente", "url": "https://blog.test/5"},
+            {"title": "Vida práctica en comunidad", "url": "https://blog.test/6"},
+            {"title": "Botánica en el aula", "url": "https://blog.test/7"},
         ]
         expected_slug = build_post_slug(post)
         events = []
@@ -257,6 +273,10 @@ class E5PipelineIntegrationTests(unittest.TestCase):
             self.assertEqual(kwargs["recent_posts"], recent[:2])
             self.assertTrue(kwargs["html"].endswith("|stripped"))
             return f'{kwargs["html"]}|sanitized', {}
+
+        def evaluate_quality(title, recent_titles, threshold):
+            self.assertEqual(recent_titles, [item["title"] for item in recent[:6]])
+            return check_title_novelty(title, recent_titles, threshold)
 
         def apply_funnel(html, decision):
             events.append("apply")
@@ -289,6 +309,13 @@ class E5PipelineIntegrationTests(unittest.TestCase):
                     run_cuadernillos,
                     "list_recent_published_posts",
                     return_value=recent,
+                )
+            )
+            stack.enter_context(
+                patch.object(
+                    run_cuadernillos,
+                    "check_title_novelty",
+                    side_effect=evaluate_quality,
                 )
             )
             decision = stack.enter_context(
@@ -480,6 +507,110 @@ class E5PipelineIntegrationTests(unittest.TestCase):
         for mocked in forbidden.values():
             mocked.assert_not_called()
         self.assertEqual(marked.call_args.kwargs["status"], "cuad_quality_failed")
+
+    def test_main_history_unavailable_records_safe_failure_and_stops(self):
+        article = SearchResult(
+            title="Fuente editorial",
+            url="https://source.example.test/article",
+            snippet="Resumen",
+        )
+        post = _post()
+        forbidden_names = (
+            "strip_uncontrolled_commercial_links",
+            "sanitize_and_enrich_body",
+            "apply_conversion_funnel",
+            "generate_cover_image",
+            "upload_media",
+            "create_draft",
+            "notify_draft_created",
+        )
+        private_detail = "private body https://wordpress.example.test/authenticated"
+
+        with ExitStack() as stack:
+            stack.enter_context(_config_patch())
+            stack.enter_context(patch.object(main, "search_all", return_value=[article]))
+            stack.enter_context(
+                patch.object(main, "select_best", return_value=(article, 0.91))
+            )
+            stack.enter_context(patch.object(main, "enrich_article", return_value=article))
+            stack.enter_context(patch.object(main, "generate_post", return_value=post))
+            recent_fetch = stack.enter_context(
+                patch.object(
+                    main,
+                    "list_recent_published_posts",
+                    side_effect=RecentPostsUnavailable(private_detail),
+                )
+            )
+            forbidden = {
+                name: stack.enter_context(patch.object(main, name))
+                for name in forbidden_names
+            }
+            marked = stack.enter_context(patch.object(main.state, "mark_processed"))
+
+            with self.assertLogs("main", level="WARNING") as captured:
+                result = main.run_topic_pipeline(_topic())
+
+        self.assertFalse(result)
+        recent_fetch.assert_called_once_with(limit=6)
+        for mocked in forbidden.values():
+            mocked.assert_not_called()
+        self.assertEqual(
+            marked.call_args.kwargs["status"], "quality_history_unavailable"
+        )
+        rendered = "\n".join(captured.output)
+        self.assertIn("Quality gate", rendered)
+        self.assertNotIn(private_detail, rendered)
+        self.assertNotIn("wordpress.example.test", rendered)
+
+    def test_cuadernillo_history_unavailable_records_safe_failure_and_stops(self):
+        item = _cuadernillo()
+        post = _post()
+        forbidden_names = (
+            "strip_uncontrolled_commercial_links",
+            "sanitize_and_enrich_body",
+            "apply_conversion_funnel",
+            "generate_cover_image",
+            "upload_media",
+            "create_draft",
+            "notify_draft_created",
+        )
+        private_detail = "private body https://wordpress.example.test/authenticated"
+
+        with ExitStack() as stack:
+            stack.enter_context(_config_patch())
+            stack.enter_context(
+                patch.object(run_cuadernillos, "generate_post", return_value=post)
+            )
+            recent_fetch = stack.enter_context(
+                patch.object(
+                    run_cuadernillos,
+                    "list_recent_published_posts",
+                    side_effect=RecentPostsUnavailable(private_detail),
+                )
+            )
+            forbidden = {
+                name: stack.enter_context(patch.object(run_cuadernillos, name))
+                for name in forbidden_names
+            }
+            marked = stack.enter_context(
+                patch.object(run_cuadernillos.state, "mark_processed")
+            )
+
+            with self.assertLogs("run_cuadernillos", level="WARNING") as captured:
+                result = run_cuadernillos._process_one(item, dry_run=False)
+
+        self.assertFalse(result)
+        recent_fetch.assert_called_once_with(limit=6)
+        for mocked in forbidden.values():
+            mocked.assert_not_called()
+        self.assertEqual(
+            marked.call_args.kwargs["status"],
+            "cuad_quality_history_unavailable",
+        )
+        rendered = "\n".join(captured.output)
+        self.assertIn("Quality gate", rendered)
+        self.assertNotIn(private_detail, rendered)
+        self.assertNotIn("wordpress.example.test", rendered)
 
     def test_draft_runners_have_no_indexnow_path(self):
         runner_source = "\n".join(

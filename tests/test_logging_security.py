@@ -1,5 +1,8 @@
 import logging
+import sys
 import unittest
+
+import httpx
 
 from logging_security import RedactingFormatter, redact_text
 
@@ -31,6 +34,44 @@ class LoggingSecurityTests(unittest.TestCase):
         rendered = formatter.format(record)
         self.assertNotIn("999999:XYZ", rendered)
         self.assertIn("[REDACTED]", rendered)
+
+    def test_formatter_redacts_cse_key_in_http_status_error_url(self):
+        formatter = RedactingFormatter("%(levelname)s %(message)s")
+        request = httpx.Request(
+            "GET",
+            (
+                "https://www.googleapis.com/customsearch/v1"
+                "?key=dummy-cse-secret&cx=public-context&q=montessori"
+            ),
+        )
+        response = httpx.Response(403, request=request)
+        try:
+            response.raise_for_status()
+        except httpx.HTTPStatusError as exc:
+            record = logging.LogRecord(
+                "test",
+                logging.ERROR,
+                __file__,
+                1,
+                "Google CSE failed: %s",
+                (exc,),
+                exc_info=sys.exc_info(),
+            )
+
+        rendered = formatter.format(record)
+
+        self.assertNotIn("dummy-cse-secret", rendered)
+        self.assertIn("cx=public-context", rendered)
+        self.assertIn("q=montessori", rendered)
+        self.assertIn("key=[REDACTED]", rendered)
+
+        ampersand_clean = redact_text(
+            "https://www.googleapis.com/customsearch/v1"
+            "?cx=public-context&key=second-dummy-secret&q=montessori"
+        )
+        self.assertNotIn("second-dummy-secret", ampersand_clean)
+        self.assertIn("cx=public-context", ampersand_clean)
+        self.assertIn("q=montessori", ampersand_clean)
 
 
 if __name__ == "__main__":
