@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import hashlib
 from dataclasses import dataclass
-from urllib.parse import urlencode, urlparse
+from urllib.parse import unquote, urlencode, urlparse, urlsplit
 
 from bs4 import BeautifulSoup, NavigableString
 
@@ -40,6 +40,20 @@ CONTEXT_COPY = (
 
 FUNNEL_MARKER_PREFIX = "ammac-training-"
 FUNNEL_MARKER_ATTRIBUTES = frozenset({"data-program-id", "data-cta-position"})
+C0_AND_SPACE = "".join(chr(codepoint) for codepoint in range(0x21))
+SEMANTICALLY_UNSAFE_ELEMENTS = frozenset(
+    {
+        "template",
+        "noscript",
+        "script",
+        "style",
+        "textarea",
+        "title",
+        "select",
+        "option",
+        "head",
+    }
+)
 
 
 @dataclass(frozen=True)
@@ -129,18 +143,40 @@ def strip_uncontrolled_commercial_links(html: str) -> tuple[str, int]:
     return str(soup), removed
 
 
+def _normalize_special_url(href: str) -> str:
+    normalized = href.strip(C0_AND_SPACE)
+    normalized = normalized.replace("\t", "").replace("\n", "").replace("\r", "")
+    normalized = normalized.replace("\\", "/")
+
+    lowered = normalized.lower()
+    for scheme in ("https:", "http:"):
+        if lowered.startswith(scheme):
+            authority = normalized[len(scheme) :].lstrip("/")
+            return f"{scheme}//{authority}"
+
+    if normalized.startswith("//"):
+        return f"//{normalized.lstrip('/')}"
+    return normalized
+
+
 def _strip_uncontrolled_commercial_links(soup: BeautifulSoup) -> int:
     allowed_host = urlparse(config.CERTIFICATION_SITE_URL).hostname
+    commercial_hosts = {allowed_host, f"www.{allowed_host}"}
     removed = 0
     for anchor in soup.find_all("a", href=True):
-        normalized_href = str(anchor.get("href") or "").strip().replace("\\", "/")
+        normalized_href = _normalize_special_url(str(anchor.get("href") or ""))
         try:
-            host = urlparse(normalized_href).hostname
-        except ValueError:
+            encoded_host = urlsplit(normalized_href).hostname
+            host = (
+                unquote(encoded_host, errors="strict").lower().rstrip(".")
+                if encoded_host is not None
+                else None
+            )
+        except (UnicodeError, ValueError):
             anchor.unwrap()
             removed += 1
             continue
-        if host in {allowed_host, f"www.{allowed_host}"}:
+        if host in commercial_hosts:
             anchor.unwrap()
             removed += 1
     return removed
@@ -250,9 +286,17 @@ def _is_hidden(element) -> bool:
     return bool(str(attributes.get("style", "")).strip())
 
 
+def _is_semantically_unsafe(element) -> bool:
+    if element.name in SEMANTICALLY_UNSAFE_ELEMENTS:
+        return True
+    return element.name in {"details", "dialog"} and not element.has_attr("open")
+
+
 def _is_safe_insertion_target(element) -> bool:
     return all(
-        ancestor.name != "a" and not _is_hidden(ancestor)
+        ancestor.name != "a"
+        and not _is_hidden(ancestor)
+        and not _is_semantically_unsafe(ancestor)
         for ancestor in (element, *element.parents)
     )
 

@@ -308,6 +308,42 @@ class ConversionFunnelTests(unittest.TestCase):
         self.assertIsNone(contextual.find_parent(id="styled-hidden"))
         self.assertEqual(contextual.find_previous_sibling("p")["id"], "visible")
 
+    def test_contextual_insertion_skips_template_and_noscript(self):
+        decision = resolve_conversion_decision(
+            "casa", "medium", "observacion-casa", "Observación en Casa"
+        )
+        html = (
+            '<template><p id="template">Plantilla</p></template>'
+            '<noscript><p id="noscript">Alternativa sin scripts</p></noscript>'
+            '<p id="visible">Visible</p>'
+        )
+
+        with patch("config.CONVERSION_CTA_ENABLED", True):
+            output, _ = apply_conversion_funnel(html, decision)
+
+        soup = BeautifulSoup(output, "html.parser")
+        contextual = soup.select_one("p.ammac-training-context")
+        self.assertEqual(contextual.find_previous_sibling("p")["id"], "visible")
+        self.assertIsNone(contextual.find_parent(["template", "noscript"]))
+
+    def test_contextual_insertion_skips_closed_details_and_dialog(self):
+        decision = resolve_conversion_decision(
+            "casa", "medium", "observacion-casa", "Observación en Casa"
+        )
+        html = (
+            '<details><p id="closed-details">Detalles cerrados</p></details>'
+            '<dialog><p id="closed-dialog">Diálogo cerrado</p></dialog>'
+            '<p id="visible">Visible</p>'
+        )
+
+        with patch("config.CONVERSION_CTA_ENABLED", True):
+            output, _ = apply_conversion_funnel(html, decision)
+
+        soup = BeautifulSoup(output, "html.parser")
+        contextual = soup.select_one("p.ammac-training-context")
+        self.assertEqual(contextual.find_previous_sibling("p")["id"], "visible")
+        self.assertIsNone(contextual.find_parent(["details", "dialog"]))
+
     def test_contextual_insertion_uses_safe_root_fallback(self):
         decision = resolve_conversion_decision(
             "casa", "medium", "observacion-casa", "Observaci\u00f3n en Casa"
@@ -533,6 +569,51 @@ class ConversionFunnelTests(unittest.TestCase):
         unrelated_urls = (
             "https://certificacionmontessori.com.evil.example\\oferta",
             "//certificacionmontessori.com.evil.example\\oferta",
+        )
+        html = "".join(
+            f'<a href="{url}">Link {index}</a>'
+            for index, url in enumerate((*commercial_urls, *unrelated_urls))
+        )
+
+        cleaned, removed = strip_uncontrolled_commercial_links(html)
+
+        soup = BeautifulSoup(cleaned, "html.parser")
+        self.assertEqual(removed, len(commercial_urls))
+        self.assertEqual(
+            [anchor["href"] for anchor in soup.find_all("a")],
+            list(unrelated_urls),
+        )
+
+    def test_strips_whatwg_like_special_url_authorities(self):
+        commercial_urls = (
+            "https:////certificacionmontessori.com/oferta",
+            "https:/\\/certificacionmontessori.com/oferta",
+            "https:\\\\certificacionmontessori.com\\oferta",
+            "http:certificacionmontessori.com/oferta",
+            "////certificacionmontessori.com/oferta",
+            "//www.certificacionmontessori.com/oferta",
+            "\x00 \thttps:\r////certificacionmontessori.com/oferta\n ",
+        )
+        html = "".join(
+            f'<a href="{url}">Comercial {index}</a>'
+            for index, url in enumerate(commercial_urls)
+        )
+
+        cleaned, removed = strip_uncontrolled_commercial_links(html)
+
+        soup = BeautifulSoup(cleaned, "html.parser")
+        self.assertEqual(removed, len(commercial_urls))
+        self.assertFalse(soup.find_all("a"))
+
+    def test_strips_encoded_and_trailing_dot_certification_hosts_only(self):
+        commercial_urls = (
+            "https://%63ertificacionmontessori.com/oferta",
+            "https://www.%63ertificacionmontessori.com./oferta",
+        )
+        unrelated_urls = (
+            "https://certificacionmontessori.com.evil.example/oferta",
+            "https://fuente.example/certificacionmontessori.com/oferta",
+            "https://fuente.example/?next=certificacionmontessori.com",
         )
         html = "".join(
             f'<a href="{url}">Link {index}</a>'
