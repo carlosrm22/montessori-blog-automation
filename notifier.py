@@ -130,11 +130,20 @@ def notify_draft_created(
         "commercial_relevance": commercial_relevance,
         "destination_url": destination_url,
     }
+    channel_configured = bool(config.NOTIFY_WEBHOOK_URL) or bool(
+        config.TELEGRAM_BOT_TOKEN and config.TELEGRAM_CHAT_ID
+    )
     sent = False
     sent = _send_webhook(message, payload) or sent
     sent = _send_telegram(message) or sent
     if not sent:
-        logger.info(
-            "Borrador creado, pero no hay canal de notificación configurado. "
-            "Define NOTIFY_WEBHOOK_URL o TELEGRAM_BOT_TOKEN+TELEGRAM_CHAT_ID."
-        )
+        if channel_configured:
+            logger.warning(
+                "Borrador creado y registrado, pero falló la entrega por todos "
+                "los canales configurados."
+            )
+        else:
+            logger.info(
+                "Borrador creado, pero no hay canal de notificación configurado. "
+                "Define NOTIFY_WEBHOOK_URL o TELEGRAM_BOT_TOKEN+TELEGRAM_CHAT_ID."
+            )
