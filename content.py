@@ -16,6 +16,10 @@ import config
 from search import SearchResult
 
 logger = logging.getLogger(__name__)
+CONVERSION_INTENTS = frozenset(
+    {"nido", "casa", "taller", "cosmica", "neuro", "general_training", "editorial"}
+)
+COMMERCIAL_RELEVANCE_LEVELS = frozenset({"high", "medium", "low"})
 POST_SCHEMA = {
     "type": "object",
     "required": [
@@ -29,6 +33,8 @@ POST_SCHEMA = {
         "focus_keyphrase",
         "image_prompt",
         "image_alt_text",
+        "conversion_intent",
+        "commercial_relevance",
     ],
     "properties": {
         "title": {"type": "string"},
@@ -46,6 +52,14 @@ POST_SCHEMA = {
         "social_image_source": {"type": "string"},
         "image_prompt": {"type": "string"},
         "image_alt_text": {"type": "string"},
+        "conversion_intent": {
+            "type": "string",
+            "enum": sorted(CONVERSION_INTENTS),
+        },
+        "commercial_relevance": {
+            "type": "string",
+            "enum": sorted(COMMERCIAL_RELEVANCE_LEVELS),
+        },
     },
 }
 
@@ -67,6 +81,8 @@ class GeneratedPost:
     social_image_source: str
     image_prompt: str
     image_alt_text: str
+    conversion_intent: str
+    commercial_relevance: str
 
 
 def _is_public_source_url(url: str) -> bool:
@@ -546,6 +562,16 @@ def _normalize_generated_post(data: dict) -> GeneratedPost:
         125,
     )
 
+    conversion_intent = str(data.get("conversion_intent", "editorial")).strip().lower()
+    commercial_relevance = str(data.get("commercial_relevance", "low")).strip().lower()
+    if conversion_intent not in CONVERSION_INTENTS:
+        conversion_intent = "editorial"
+        commercial_relevance = "low"
+    if commercial_relevance not in COMMERCIAL_RELEVANCE_LEVELS:
+        commercial_relevance = "low"
+    if conversion_intent == "editorial":
+        commercial_relevance = "low"
+
     post = GeneratedPost(
         title=title,
         body=body,
@@ -562,6 +588,8 @@ def _normalize_generated_post(data: dict) -> GeneratedPost:
         social_image_source=social_image_source,
         image_prompt=_clean_spaces(data.get("image_prompt", "")),
         image_alt_text=image_alt_text,
+        conversion_intent=conversion_intent,
+        commercial_relevance=commercial_relevance,
     )
     return _align_focus_keyphrase(post)
 

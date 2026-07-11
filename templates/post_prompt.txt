@@ -75,6 +75,25 @@ No se pudo extraer el texto completo de la fuente. Usa el fragmento y mantén af
 2. Debe ser apta para portada de blog educativo
 3. Incluir `image_alt_text` descriptivo y accesible en español (<= 125 caracteres)
 
+## Clasificación comercial controlada
+Devuelve dos campos de clasificación; NO escribas CTA ni inventes enlaces dentro del body.
+
+`conversion_intent` debe ser exactamente uno de:
+- `nido`: Nido o Comunidad Infantil.
+- `casa`: Casa de Niños.
+- `taller`: Taller I o II, primaria Montessori o segundo plano de desarrollo.
+- `cosmica`: Educación Cósmica o Grandes Lecciones.
+- `neuro`: neuroeducación, neurociencia educativa o desarrollo cerebral.
+- `general_training`: formación, certificación o trabajo profesional como Guía Montessori sin nivel específico.
+- `editorial`: crianza, noticias, vida familiar o educación general sin relación clara con una formación anterior.
+
+`commercial_relevance` debe ser exactamente uno de:
+- `high`: el propósito central ayuda a decidir estudiar, certificarse o trabajar como Guía.
+- `medium`: el tema corresponde a un programa, pero el artículo es principalmente pedagógico.
+- `low`: no existe una relación comercial natural.
+
+Ante duda usa `editorial` y `low`.
+
 ## Formato de respuesta
 Responde SOLO con un JSON válido (sin markdown) con estos campos:
 {
@@ -92,5 +111,7 @@ Responde SOLO con un JSON válido (sin markdown) con estos campos:
     "twitter_description": "Descripción social para X/Twitter (máx 155)",
     "social_image_source": "featured_media",
     "image_prompt": "Prompt en inglés para generar una imagen de portada profesional y educativa relacionada con el tema del artículo. Estilo: cálido, profesional, educativo, fotografía editorial.",
-    "image_alt_text": "Texto alternativo accesible y descriptivo de la imagen (en español)"
+    "image_alt_text": "Texto alternativo accesible y descriptivo de la imagen (en español)",
+    "conversion_intent": "editorial",
+    "commercial_relevance": "low"
 }
