@@ -72,6 +72,9 @@ Variables principales:
 - `GEMINI_TEXT_MODEL`: modelo legacy usado como fallback para scoring/contenido si no defines los modelos específicos (default `gemini-3.5-flash`).
 - `GEMINI_SCORER_MODEL`: modelo para scoring de relevancia (default `gemini-3.5-flash-lite`, o `GEMINI_TEXT_MODEL` si está definido).
 - `GEMINI_CONTENT_MODEL`: modelo para generación de artículos (default `gemini-3.5-flash`, o `GEMINI_TEXT_MODEL` si está definido).
+- `GEMINI_CONTENT_TIMEOUT_SECONDS`: tiempo máximo de cada petición de redacción (default `120`).
+- `GEMINI_CONTENT_MAX_ATTEMPTS`: intentos explícitos de redacción; el SDK queda sin reintentos internos (default `3`, máximo `5`).
+- `GEMINI_CONTENT_RETRY_DELAY_SECONDS`: espera base entre intentos; se duplica en cada reintento (default `20`).
 - `SCORER_MIN_INTERVAL_SECONDS`: separación mínima entre evaluaciones Gemini; `4.1` respeta el límite gratuito de 15 solicitudes por minuto (`0` desactiva el ritmo).
 - `GEMINI_IMAGE_MODEL`: modelo para portada (default `gemini-2.5-flash-image`).
 - `IMAGE_WORKFLOW`: `manual` (default) guarda un paquete y espera una portada creada en ChatGPT; `gemini` conserva el generador de imágenes por API como alternativa.

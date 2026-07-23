@@ -70,6 +70,23 @@ def validate() -> None:
         logging.critical("MIN_BODY_WORDS debe ser al menos 300")
         sys.exit(1)
     if (
+        not math.isfinite(GEMINI_CONTENT_TIMEOUT_SECONDS)
+        or GEMINI_CONTENT_TIMEOUT_SECONDS <= 0
+    ):
+        logging.critical("GEMINI_CONTENT_TIMEOUT_SECONDS debe ser mayor a 0")
+        sys.exit(1)
+    if GEMINI_CONTENT_MAX_ATTEMPTS < 1 or GEMINI_CONTENT_MAX_ATTEMPTS > 5:
+        logging.critical("GEMINI_CONTENT_MAX_ATTEMPTS debe estar entre 1 y 5")
+        sys.exit(1)
+    if (
+        not math.isfinite(GEMINI_CONTENT_RETRY_DELAY_SECONDS)
+        or GEMINI_CONTENT_RETRY_DELAY_SECONDS < 0
+    ):
+        logging.critical(
+            "GEMINI_CONTENT_RETRY_DELAY_SECONDS debe ser un número no negativo"
+        )
+        sys.exit(1)
+    if (
         not math.isfinite(SCORER_MIN_INTERVAL_SECONDS)
         or SCORER_MIN_INTERVAL_SECONDS < 0
     ):
@@ -266,6 +283,15 @@ GEMINI_CONTENT_MODEL = (
     os.environ.get("GEMINI_CONTENT_MODEL", "").strip()
     or _LEGACY_GEMINI_TEXT_MODEL
     or "gemini-3.5-flash"
+)
+GEMINI_CONTENT_TIMEOUT_SECONDS = float(
+    os.environ.get("GEMINI_CONTENT_TIMEOUT_SECONDS", "120")
+)
+GEMINI_CONTENT_MAX_ATTEMPTS = int(
+    os.environ.get("GEMINI_CONTENT_MAX_ATTEMPTS", "3")
+)
+GEMINI_CONTENT_RETRY_DELAY_SECONDS = float(
+    os.environ.get("GEMINI_CONTENT_RETRY_DELAY_SECONDS", "20")
 )
 SCORER_MIN_INTERVAL_SECONDS = float(
     os.environ.get("SCORER_MIN_INTERVAL_SECONDS", "4.1")

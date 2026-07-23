@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import logging
 import re
+import time
 import unicodedata
 from dataclasses import dataclass
 from urllib.parse import urlparse
@@ -615,9 +616,18 @@ def _build_retry_guidance(last_error: str | None) -> str:
     return ""
 
 
+def _wait_before_content_retry(attempt: int) -> None:
+    delay = config.GEMINI_CONTENT_RETRY_DELAY_SECONDS * (2**attempt)
+    logger.info(
+        "Reintentando generación de contenido en %.1f segundos",
+        delay,
+    )
+    time.sleep(delay)
+
+
 def generate_post(
     article: SearchResult,
-    max_retries: int = 2,
+    max_retries: int | None = None,
     topic_name: str = "Montessori",
     topic_writing_guidelines: str = "",
     template_name: str = "post_prompt.txt",
@@ -636,10 +646,21 @@ def generate_post(
         author_name=author_name,
         author_tone=author_tone,
     )
-    client = genai.Client(api_key=config.GEMINI_API_KEY)
+    attempts = (
+        config.GEMINI_CONTENT_MAX_ATTEMPTS
+        if max_retries is None
+        else max_retries
+    )
+    client = genai.Client(
+        api_key=config.GEMINI_API_KEY,
+        http_options=genai.types.HttpOptions(
+            timeout=max(1, round(config.GEMINI_CONTENT_TIMEOUT_SECONDS * 1000)),
+            retry_options=genai.types.HttpRetryOptions(attempts=1),
+        ),
+    )
     last_error: str | None = None
 
-    for attempt in range(max_retries):
+    for attempt in range(attempts):
         try:
             prompt = base_prompt + _build_retry_guidance(last_error)
             response = client.models.generate_content(
@@ -671,7 +692,8 @@ def generate_post(
                     config.MIN_BODY_WORDS,
                 )
                 last_error = f"short:{word_count}"
-                if attempt < max_retries - 1:
+                if attempt < attempts - 1:
+                    _wait_before_content_retry(attempt)
                     continue
                 return None
 
@@ -684,7 +706,8 @@ def generate_post(
                     blocked,
                 )
                 last_error = f"blocked:{blocked}"
-                if attempt < max_retries - 1:
+                if attempt < attempts - 1:
+                    _wait_before_content_retry(attempt)
                     continue
                 return None
             logger.info("Artículo generado: '%s' (%d palabras)", post.title, word_count)
@@ -693,10 +716,11 @@ def generate_post(
         except Exception as exc:
             logger.warning("Content generation attempt %d failed: %s", attempt + 1, exc)
             last_error = f"exception:{type(exc).__name__}"
-            if attempt < max_retries - 1:
+            if attempt < attempts - 1:
+                _wait_before_content_retry(attempt)
                 continue
 
-    logger.error("Failed to generate content after %d attempts", max_retries)
+    logger.error("Failed to generate content after %d attempts", attempts)
     return None
 
 
