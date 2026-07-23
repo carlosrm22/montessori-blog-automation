@@ -67,9 +67,10 @@ Variables principales:
 - `MIN_USABILITY_SCORE`: umbral mínimo para publicar.
 - `MIN_BODY_WORDS`: mínimo de palabras requeridas para el body (default `600`).
 - `DRY_RUN`: `1` para simular sin publicar; `0` para publicar borradores.
-- `GEMINI_TEXT_MODEL`: modelo legacy usado como fallback para scoring/contenido si no defines los modelos específicos (default `gemini-2.5-flash`).
-- `GEMINI_SCORER_MODEL`: modelo para scoring de relevancia (default `gemini-2.5-flash`, o `GEMINI_TEXT_MODEL` si está definido).
-- `GEMINI_CONTENT_MODEL`: modelo para generación de artículos (default `gemini-2.5-pro`, o `GEMINI_TEXT_MODEL` si está definido).
+- `GEMINI_TEXT_MODEL`: modelo legacy usado como fallback para scoring/contenido si no defines los modelos específicos (default `gemini-3.5-flash`).
+- `GEMINI_SCORER_MODEL`: modelo para scoring de relevancia (default `gemini-3.5-flash-lite`, o `GEMINI_TEXT_MODEL` si está definido).
+- `GEMINI_CONTENT_MODEL`: modelo para generación de artículos (default `gemini-3.5-flash`, o `GEMINI_TEXT_MODEL` si está definido).
+- `SCORER_MIN_INTERVAL_SECONDS`: separación mínima entre evaluaciones Gemini; `4.1` respeta el límite gratuito de 15 solicitudes por minuto (`0` desactiva el ritmo).
 - `GEMINI_IMAGE_MODEL`: modelo para portada (default `gemini-2.5-flash-image`).
 - `AIOSEO_SYNC`: `1` para sincronizar title/description/OG/Twitter en AIOSEO (opcional, default `0`).
 - `LOCAL_SEO_RULES_ENABLED`: habilita evaluación SEO local (`1` por defecto).

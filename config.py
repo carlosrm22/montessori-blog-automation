@@ -63,6 +63,12 @@ def validate() -> None:
     if MIN_BODY_WORDS < 300:
         logging.critical("MIN_BODY_WORDS debe ser al menos 300")
         sys.exit(1)
+    if (
+        not math.isfinite(SCORER_MIN_INTERVAL_SECONDS)
+        or SCORER_MIN_INTERVAL_SECONDS < 0
+    ):
+        logging.critical("SCORER_MIN_INTERVAL_SECONDS debe ser un número no negativo")
+        sys.exit(1)
     if SOURCE_FETCH_MAX_CHARS < 2000:
         logging.critical("SOURCE_FETCH_MAX_CHARS debe ser al menos 2000")
         sys.exit(1)
@@ -244,16 +250,19 @@ MIN_USABILITY_SCORE = float(os.environ.get("MIN_USABILITY_SCORE", "0.6"))
 MIN_BODY_WORDS = int(os.environ.get("MIN_BODY_WORDS", "600"))
 DRY_RUN = os.environ.get("DRY_RUN", "0") == "1"
 _LEGACY_GEMINI_TEXT_MODEL = os.environ.get("GEMINI_TEXT_MODEL", "").strip()
-GEMINI_TEXT_MODEL = _LEGACY_GEMINI_TEXT_MODEL or "gemini-2.5-flash"
+GEMINI_TEXT_MODEL = _LEGACY_GEMINI_TEXT_MODEL or "gemini-3.5-flash"
 GEMINI_SCORER_MODEL = (
     os.environ.get("GEMINI_SCORER_MODEL", "").strip()
     or _LEGACY_GEMINI_TEXT_MODEL
-    or "gemini-2.5-flash"
+    or "gemini-3.5-flash-lite"
 )
 GEMINI_CONTENT_MODEL = (
     os.environ.get("GEMINI_CONTENT_MODEL", "").strip()
     or _LEGACY_GEMINI_TEXT_MODEL
-    or "gemini-2.5-pro"
+    or "gemini-3.5-flash"
+)
+SCORER_MIN_INTERVAL_SECONDS = float(
+    os.environ.get("SCORER_MIN_INTERVAL_SECONDS", "4.1")
 )
 GEMINI_IMAGE_MODEL = (
     os.environ.get("GEMINI_IMAGE_MODEL", "").strip() or "gemini-2.5-flash-image"

@@ -19,6 +19,11 @@ JPEG_QUALITY = config.WP_IMAGE_QUALITY
 MAX_IMAGE_BYTES = config.WP_IMAGE_MAX_KB * 1024
 
 
+def _is_zero_quota_error(exc: Exception) -> bool:
+    message = str(exc)
+    return "RESOURCE_EXHAUSTED" in message and "limit: 0" in message
+
+
 def _prepare_cover_image(img: Image.Image) -> Image.Image:
     """Normalize orientation and fit target size without distortion."""
     img = ImageOps.exif_transpose(img).convert("RGB")
@@ -111,6 +116,12 @@ def generate_cover_image(
             logger.warning("Attempt %d: no image in response", attempt + 1)
 
         except Exception as exc:
+            if _is_zero_quota_error(exc):
+                logger.error(
+                    "Image generation has zero quota for model %s; skipping retries",
+                    MODEL,
+                )
+                return None
             wait = 2 ** (attempt + 1)
             logger.warning(
                 "Image gen attempt %d/%d failed: %s. Retrying in %ds",

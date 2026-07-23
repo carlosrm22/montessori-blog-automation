@@ -3,6 +3,7 @@
 import json
 import logging
 import re
+import time
 from datetime import datetime
 from urllib.parse import urlparse
 
@@ -12,6 +13,7 @@ import config
 from search import SearchResult
 
 logger = logging.getLogger(__name__)
+_last_scorer_request_at: float | None = None
 
 SCORING_PROMPT = """Eres un evaluador experto en educación.
 
@@ -69,6 +71,24 @@ def _clamp(value: float, min_v: float = 0.0, max_v: float = 1.0) -> float:
     return max(min_v, min(max_v, value))
 
 
+def _pace_scorer_request() -> None:
+    """Space scorer requests so the free Gemini tier is not burst-limited."""
+    global _last_scorer_request_at
+
+    interval = config.SCORER_MIN_INTERVAL_SECONDS
+    if interval <= 0:
+        return
+
+    now = time.monotonic()
+    if _last_scorer_request_at is not None:
+        remaining = interval - (now - _last_scorer_request_at)
+        if remaining > 0:
+            time.sleep(remaining)
+            now += remaining
+
+    _last_scorer_request_at = now
+
+
 def _year_freshness_bonus(article: SearchResult) -> float:
     """Small bonus if snippet/title mentions current or recent year."""
     text = f"{article.title} {article.snippet}"
@@ -119,6 +139,7 @@ def score_article(
         title=article.title, url=article.url, snippet=article.snippet,
     )
     try:
+        _pace_scorer_request()
         client = genai.Client(api_key=config.GEMINI_API_KEY)
         response = client.models.generate_content(
             model=config.GEMINI_SCORER_MODEL,
