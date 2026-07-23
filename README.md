@@ -10,17 +10,19 @@ El flujo completo hace lo siguiente:
 4. Extrae texto real de la fuente para base factual.
 5. Genera un artículo original en HTML.
 6. Evalúa SEO local (TruSEO-like + Headline score) con reglas checklist sin usar API de AIOSEO.
-7. Genera imagen de portada optimizada para WordPress.
-8. Publica borrador en WordPress (AIOSEO API opcional y desactivada por defecto).
-9. Guarda estado en SQLite por tema para no reprocesar URLs y reportes SEO por URL.
+7. Guarda el artículo completo en una cola persistente y envía por Telegram el prompt exacto de portada.
+8. Espera una imagen creada manualmente en ChatGPT; no crea todavía ningún borrador en WordPress.
+9. Valida, recorta y optimiza la portada a `1200x630`, y solo entonces crea el borrador con imagen destacada.
+10. Guarda estado en SQLite por tema para no reprocesar URLs y reportes SEO por URL.
 
 ## Requisitos
 
 - Python 3.10+
 - Cuenta/API para:
   - Brave Search API
-  - Gemini API (`google-genai`)
+  - Gemini API (`google-genai`) para análisis y redacción
   - WordPress con Application Password
+- ChatGPT con generación de imágenes para crear las portadas del flujo manual.
 
 ## Instalación
 
@@ -72,7 +74,9 @@ Variables principales:
 - `GEMINI_CONTENT_MODEL`: modelo para generación de artículos (default `gemini-3.5-flash`, o `GEMINI_TEXT_MODEL` si está definido).
 - `SCORER_MIN_INTERVAL_SECONDS`: separación mínima entre evaluaciones Gemini; `4.1` respeta el límite gratuito de 15 solicitudes por minuto (`0` desactiva el ritmo).
 - `GEMINI_IMAGE_MODEL`: modelo para portada (default `gemini-2.5-flash-image`).
-- `REQUIRE_FEATURED_IMAGE`: `1` bloquea la creación del borrador si Gemini no genera la portada o WordPress no acepta su subida (default y recomendado); `0` permite borradores sin imagen destacada.
+- `IMAGE_WORKFLOW`: `manual` (default) guarda un paquete y espera una portada creada en ChatGPT; `gemini` conserva el generador de imágenes por API como alternativa.
+- `MANUAL_IMAGE_MAX_MB`: tamaño máximo admitido para la imagen manual antes de procesarla (default `20`).
+- `REQUIRE_FEATURED_IMAGE`: `1` bloquea la creación del borrador si falta la portada o WordPress no acepta su subida (default y recomendado); `0` permite borradores sin imagen destacada en el flujo `gemini`.
 - `AIOSEO_SYNC`: `1` para sincronizar title/description/OG/Twitter en AIOSEO (opcional, default `0`).
 - `LOCAL_SEO_RULES_ENABLED`: habilita evaluación SEO local (`1` por defecto).
 - `TRUSEO_MIN_SCORE`: mínimo TruSEO-like para publicar automáticamente (default `70`).
@@ -170,6 +174,44 @@ source .venv/bin/activate
 python main.py
 ```
 
+### Portadas manuales con ChatGPT
+
+Con `IMAGE_WORKFLOW=manual`, una corrida válida genera como máximo un paquete pendiente y **no crea un borrador de WordPress**. Telegram entrega el ID único, título, texto alternativo, prompt exacto, ruta esperada para la imagen y comando de reanudación.
+
+Procedimiento:
+
+1. Copia en ChatGPT el prompt recibido por Telegram y genera la portada.
+2. Descarga la imagen como PNG, JPG/JPEG o WEBP. Debe medir al menos `600x315` px.
+3. Guárdala con el ID indicado, por ejemplo:
+
+```text
+/home/carlos/montessori-blog-automation/data/manual_image_queue/inbox/img-20260722-120000-1234abcd.png
+```
+
+4. Ejecuta el comando incluido en Telegram:
+
+```bash
+/home/carlos/montessori-blog-automation/process_manual_cover.sh img-20260722-120000-1234abcd
+```
+
+También puedes conservar la imagen en cualquier ubicación y pasar su ruta explícitamente:
+
+```bash
+./process_manual_cover.sh img-20260722-120000-1234abcd /ruta/a/portada.webp
+```
+
+El procesador valida el archivo, elimina metadatos, normaliza orientación, recorta sin deformar, aplica el brand kit, optimiza a JPEG y sube la portada. El borrador se crea únicamente después de que WordPress confirma la imagen destacada.
+
+Si se interrumpe una subida o la creación del post, vuelve a ejecutar el mismo comando. El trabajo conserva su etapa, reutiliza la imagen o `media_id` existente y busca un borrador coincidente antes de crear otro. Mientras haya un paquete pendiente, ambos generadores bloquean paquetes nuevos.
+
+Rutas operativas:
+
+- Pendientes: `data/manual_image_queue/jobs/`
+- Entrada de imágenes: `data/manual_image_queue/inbox/`
+- Completados: `data/manual_image_queue/completed/`
+
+No edites `job.json` manualmente. Un contrato dañado se bloquea deliberadamente para evitar publicaciones incompletas.
+
 Ver reportes SEO locales guardados:
 
 ```bash
@@ -229,7 +271,10 @@ La programación queda diaria a las `08:00` y `Persistent=true` hace que, si la 
 ├── seo_rules.py     # TruSEO-like + Headline scoring local
 ├── content.py       # Generación de artículo en HTML
 ├── source_fetch.py  # Fetch + extracción de contenido de la fuente
-├── image_gen.py     # Generación de portada con Gemini
+├── image_gen.py     # Generación o preparación segura de portadas
+├── manual_image_queue.py # Cola persistente de una portada manual
+├── resume_manual_image.py # Reanuda el paquete y crea el borrador
+├── process_manual_cover.sh # Comando operativo para procesar la imagen
 ├── branding.py      # Brand kits (prompt wrapper + postproceso visual)
 ├── assets/logos/    # Logos para overlay opcional en portadas
 ├── wordpress.py     # Publicación de borradores vía WP REST API
@@ -245,7 +290,8 @@ La programación queda diaria a las `08:00` y `Persistent=true` hace que, si la 
 ├── brand_kits.yml    # Configuración visual de marca para portadas
 ├── data/
 │   ├── blog_state.db
-│   └── images/
+│   ├── images/
+│   └── manual_image_queue/
 └── logs/
 ```
 
@@ -254,6 +300,7 @@ La programación queda diaria a las `08:00` y `Persistent=true` hace que, si la 
 - Base de estado: `data/blog_state.db`
 - Reportes SEO locales: tabla `seo_reports` en `data/blog_state.db`
 - Imágenes: `data/images/`
+- Cola manual de portadas: `data/manual_image_queue/`
 - Logs rotativos: `logs/automation.log`
 
 ## Notas operativas
@@ -270,7 +317,7 @@ La programación queda diaria a las `08:00` y `Persistent=true` hace que, si la 
 - El gate de novedad compara el título editorial con publicaciones recientes antes de generar la portada o escribir en WordPress.
 - Se exige `title` corto (<=60), focus keyphrase en meta description, al menos un enlace interno y metadatos sociales OG/X.
 - `seo_title`, `og_title` y `twitter_title` se normalizan al formato `Título | Sitio` (configurable).
-- La portada aplica `brand kit` (prompt + color grading) para consistencia visual por marca.
+- La portada manual aplica `brand kit` (prompt + color grading) para consistencia visual por marca.
 - Opcionalmente puede superponer un logo de marca (overlay sutil) cuando `BRAND_LOGO_ENABLED=1`.
 - Antes de publicar, se limpian enlaces rotos/inválidos y solo se conservan URLs verificadas.
 - La galería final de "Publicaciones Recientes" usa posts reales publicados en WordPress (no enlaces inventados).
@@ -278,7 +325,7 @@ La programación queda diaria a las `08:00` y `Persistent=true` hace que, si la 
 - Si la fuente no tiene URL pública válida (por ejemplo dominios `.local`), no se genera enlace roto en la atribución.
 - El enfoque editorial es internacional por defecto; se añade contexto local solo cuando realmente aporta.
 - El orden de publicación rota automáticamente por `topic_id` tomando como referencia el último borrador publicado.
-- Cuando se crea un borrador, el sistema puede enviar una notificación con título, autor, puntajes SEO y enlace directo de edición.
+- Telegram avisa primero cuando falta la portada y vuelve a notificar cuando el borrador completo ya existe.
 - Los dos pipelines crean únicamente posts con estado `draft`; la creación de borradores no publica el post ni llama a IndexNow.
 
 ## Licencia

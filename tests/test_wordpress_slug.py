@@ -3,7 +3,7 @@ from types import SimpleNamespace
 from unittest.mock import Mock, patch
 
 import wordpress
-from wordpress import build_post_slug, create_draft
+from wordpress import build_post_slug, create_draft, find_draft_by_slug
 
 
 class WordPressSlugTests(unittest.TestCase):
@@ -61,6 +61,46 @@ class WordPressSlugTests(unittest.TestCase):
         branded_slug = build_post_slug(SimpleNamespace(title=post.seo_title))
         self.assertNotEqual(payload["slug"], branded_slug)
         sync_aioseo.assert_called_once_with(321, post)
+
+    def test_find_draft_by_slug_requires_matching_featured_media(self):
+        response = Mock()
+        response.json.return_value = [
+            {"id": 320, "slug": "observacion-montessori", "featured_media": 77},
+            {"id": 321, "slug": "observacion-montessori", "featured_media": 88},
+        ]
+
+        with patch.object(wordpress, "_request", return_value=response) as request:
+            self.assertEqual(
+                find_draft_by_slug("Observación Montessori", expected_media_id=88),
+                321,
+            )
+
+        request.assert_called_once_with(
+            "get",
+            "posts",
+            params={
+                "slug": "observacion-montessori",
+                "status": "draft",
+                "context": "edit",
+                "per_page": 10,
+            },
+            retry_on_500=False,
+        )
+
+    def test_find_draft_by_slug_does_not_reuse_wrong_featured_media(self):
+        response = Mock()
+        response.json.return_value = [
+            {"id": 320, "slug": "observacion-montessori", "featured_media": 77}
+        ]
+        with patch.object(wordpress, "_request", return_value=response):
+            self.assertIsNone(
+                find_draft_by_slug("observacion-montessori", expected_media_id=88)
+            )
+
+    def test_find_draft_by_slug_fails_closed_when_wordpress_is_unavailable(self):
+        with patch.object(wordpress, "_request", return_value=None):
+            with self.assertRaises(wordpress.DraftLookupUnavailable):
+                find_draft_by_slug("observacion-montessori", expected_media_id=88)
 
 
 if __name__ == "__main__":

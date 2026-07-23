@@ -6,6 +6,7 @@ from datetime import datetime, timedelta, timezone
 from urllib.parse import urlparse
 
 import config
+import manual_image_queue
 import state
 from search import search_all
 from scorer import select_best
@@ -22,7 +23,7 @@ from wordpress import (
 from source_fetch import enrich_article
 from topics import TopicProfile, load_topics
 from seo_rules import analyze_headline, analyze_truseo
-from notifier import notify_draft_created
+from notifier import notify_draft_created, notify_manual_image_required
 from link_optimizer import sanitize_and_enrich_body
 from conversion_funnel import (
     apply_conversion_funnel,
@@ -333,9 +334,49 @@ def run_topic_pipeline(topic: TopicProfile) -> bool:
             )
             return False
 
-    # 4. Generate cover image
-    logger.info("=== Paso 4: Generación de imagen de portada ===")
-    image_path = generate_cover_image(post.image_prompt, brand_id=topic.brand_kit)
+    # 4. Resolve cover image workflow.
+    image_path = None
+    if config.IMAGE_WORKFLOW == "manual" and not config.DRY_RUN:
+        logger.info("=== Paso 4: Cola manual de imagen de portada ===")
+        try:
+            job = manual_image_queue.enqueue_manual_image(
+                kind="article",
+                source_url=article.url,
+                source_title=article.title,
+                source_score=score,
+                topic_id=topic.topic_id,
+                terminal_status="published_draft",
+                topic_name=topic.name,
+                author_name=topic.author_name,
+                brand_id=topic.brand_kit,
+                post=post,
+                truseo_score=truseo_score,
+                headline_score=headline_score,
+                conversion_intent=decision.intent,
+                commercial_relevance=decision.relevance,
+                destination_url=decision.destination_url,
+            )
+        except manual_image_queue.PendingJobExists as exc:
+            logger.info("No se crea otro paquete de portada: %s", exc)
+            return False
+        notify_manual_image_required(
+            job_id=job["job_id"],
+            title=post.title,
+            alt_text=post.image_alt_text,
+            full_prompt=job["image"]["full_prompt"],
+            expected_path=str(manual_image_queue.expected_input_path(job["job_id"])),
+        )
+        logger.info(
+            "Artículo preservado en la cola manual %s; no se creó borrador todavía.",
+            job["job_id"],
+        )
+        return False
+
+    if config.IMAGE_WORKFLOW == "gemini":
+        logger.info("=== Paso 4: Generación de imagen de portada ===")
+        image_path = generate_cover_image(post.image_prompt, brand_id=topic.brand_kit)
+    else:
+        logger.info("=== Paso 4: DRY_RUN manual; no se solicita imagen ===")
 
     # 5. Publish to WordPress
     if config.DRY_RUN:
@@ -411,6 +452,13 @@ def run_topic_pipeline(topic: TopicProfile) -> bool:
 
 def run_pipeline() -> bool:
     """Execute topic-driven pipeline. Returns True if any post was created."""
+    pending_ids = manual_image_queue.pending_job_ids()
+    if pending_ids:
+        logger.info(
+            "Hay una portada manual pendiente (%s). No se genera otro artículo.",
+            pending_ids[0],
+        )
+        return False
     if not _is_publish_due():
         logger.info("No toca publicar en esta corrida.")
         return False
@@ -429,6 +477,9 @@ def run_pipeline() -> bool:
             break
         if run_topic_pipeline(topic):
             created += 1
+        if manual_image_queue.has_pending_job():
+            logger.info("La corrida se detiene después de crear el paquete manual.")
+            break
 
     return created > 0
 

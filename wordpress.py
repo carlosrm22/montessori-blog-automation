@@ -28,6 +28,10 @@ class RecentPostsUnavailable(RuntimeError):
     """Raised when WordPress recent-post history cannot be trusted."""
 
 
+class DraftLookupUnavailable(RuntimeError):
+    """Raised when duplicate-safe draft recovery cannot be verified."""
+
+
 def _int_to_min_be(value: int) -> bytes:
     if value <= 0xFF:
         return bytes([value])
@@ -446,6 +450,41 @@ def count_posts_by_status(status: str = "draft") -> int | None:
         except Exception:
             return None
         return len(payload) if isinstance(payload, list) else None
+
+
+def find_draft_by_slug(slug: str, expected_media_id: int | None = None) -> int | None:
+    """Return an existing draft ID for a slug, used to recover without duplicates."""
+    clean_slug = _slugify(slug)
+    if not clean_slug:
+        return None
+    resp = _request(
+        "get",
+        "posts",
+        params={
+            "slug": clean_slug,
+            "status": "draft",
+            "context": "edit",
+            "per_page": 10,
+        },
+        retry_on_500=False,
+    )
+    if resp is None:
+        raise DraftLookupUnavailable("WordPress draft lookup is unavailable")
+    try:
+        payload = resp.json()
+    except Exception as exc:
+        raise DraftLookupUnavailable("WordPress draft lookup could not be parsed") from exc
+    if not isinstance(payload, list):
+        raise DraftLookupUnavailable("WordPress draft lookup has an invalid response")
+    for item in payload:
+        if not isinstance(item, dict) or str(item.get("slug", "")) != clean_slug:
+            continue
+        if expected_media_id is not None and item.get("featured_media") != expected_media_id:
+            continue
+        post_id = item.get("id")
+        if type(post_id) is int and post_id > 0:
+            return post_id
+    return None
 
 
 def list_recent_published_posts(limit: int = 6, exclude_ids: set[int] | None = None) -> list[dict]:

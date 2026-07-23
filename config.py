@@ -60,6 +60,12 @@ def validate() -> None:
     if WP_IMAGE_QUALITY <= 0 or WP_IMAGE_QUALITY > 100:
         logging.critical("WP_IMAGE_QUALITY debe estar entre 1 y 100")
         sys.exit(1)
+    if IMAGE_WORKFLOW not in {"manual", "gemini"}:
+        logging.critical("IMAGE_WORKFLOW debe ser 'manual' o 'gemini'")
+        sys.exit(1)
+    if MANUAL_IMAGE_MAX_MB <= 0:
+        logging.critical("MANUAL_IMAGE_MAX_MB debe ser mayor a 0")
+        sys.exit(1)
     if MIN_BODY_WORDS < 300:
         logging.critical("MIN_BODY_WORDS debe ser al menos 300")
         sys.exit(1)
@@ -267,6 +273,9 @@ SCORER_MIN_INTERVAL_SECONDS = float(
 GEMINI_IMAGE_MODEL = (
     os.environ.get("GEMINI_IMAGE_MODEL", "").strip() or "gemini-2.5-flash-image"
 )
+# La cuota gratuita de Gemini Images puede ser cero. El modo manual conserva el
+# artículo completo hasta que se coloque una portada creada en ChatGPT.
+IMAGE_WORKFLOW = os.environ.get("IMAGE_WORKFLOW", "manual").strip().lower()
 REQUIRE_FEATURED_IMAGE = os.environ.get("REQUIRE_FEATURED_IMAGE", "1") == "1"
 AIOSEO_SYNC = os.environ.get("AIOSEO_SYNC", "0") == "1"
 LOCAL_SEO_RULES_ENABLED = os.environ.get("LOCAL_SEO_RULES_ENABLED", "1") == "1"
@@ -301,6 +310,8 @@ WP_IMAGE_WIDTH = int(os.environ.get("WP_IMAGE_WIDTH", "1200"))
 WP_IMAGE_HEIGHT = int(os.environ.get("WP_IMAGE_HEIGHT", "630"))
 WP_IMAGE_QUALITY = int(os.environ.get("WP_IMAGE_QUALITY", "90"))
 WP_IMAGE_MAX_KB = int(os.environ.get("WP_IMAGE_MAX_KB", "450"))
+MANUAL_IMAGE_MAX_MB = int(os.environ.get("MANUAL_IMAGE_MAX_MB", "20"))
+MANUAL_IMAGE_QUEUE_DIR = DATA_DIR / "manual_image_queue"
 SOURCE_FETCH_ENABLED = os.environ.get("SOURCE_FETCH_ENABLED", "1") == "1"
 SOURCE_FETCH_MAX_CHARS = int(os.environ.get("SOURCE_FETCH_MAX_CHARS", "15000"))
 LINK_VALIDATION_ENABLED = os.environ.get("LINK_VALIDATION_ENABLED", "1") == "1"

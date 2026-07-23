@@ -2,11 +2,13 @@
 
 import io
 import logging
+import os
 import time
+import warnings
 from pathlib import Path
 
 from google import genai
-from PIL import Image, ImageOps
+from PIL import Image, ImageOps, UnidentifiedImageError
 
 import branding
 import config
@@ -17,6 +19,12 @@ MODEL = config.GEMINI_IMAGE_MODEL
 TARGET_SIZE = (config.WP_IMAGE_WIDTH, config.WP_IMAGE_HEIGHT)
 JPEG_QUALITY = config.WP_IMAGE_QUALITY
 MAX_IMAGE_BYTES = config.WP_IMAGE_MAX_KB * 1024
+ALLOWED_MANUAL_FORMATS = frozenset({"JPEG", "PNG", "WEBP"})
+MIN_MANUAL_SIZE = (600, 315)
+
+
+class InvalidCoverImage(ValueError):
+    """Raised when a manually supplied cover cannot be accepted safely."""
 
 
 def _is_zero_quota_error(exc: Exception) -> bool:
@@ -55,6 +63,83 @@ def _save_optimized_jpeg(img: Image.Image, output_path: Path) -> None:
     )
 
 
+def build_full_cover_prompt(prompt: str, brand_id: str | None = None) -> str:
+    """Return the exact prompt used for a branded 1200x630 cover."""
+    kit = branding.load_brand_kit(brand_id=brand_id)
+    return branding.build_cover_prompt(
+        subject_prompt=prompt,
+        kit=kit,
+        width=TARGET_SIZE[0],
+        height=TARGET_SIZE[1],
+    )
+
+
+def prepare_manual_cover_image(
+    input_path: Path,
+    output_path: Path,
+    brand_id: str | None = None,
+) -> Path:
+    """Validate, crop and optimize a user-supplied cover as a metadata-free JPEG."""
+    source = Path(input_path).expanduser()
+    destination = Path(output_path).expanduser()
+    if not source.is_file():
+        raise InvalidCoverImage(f"No existe el archivo de portada: {source}")
+    if source.stat().st_size > config.MANUAL_IMAGE_MAX_MB * 1024 * 1024:
+        raise InvalidCoverImage(
+            f"La portada supera el límite de {config.MANUAL_IMAGE_MAX_MB} MB"
+        )
+
+    try:
+        with warnings.catch_warnings():
+            warnings.simplefilter("error", Image.DecompressionBombWarning)
+            with Image.open(source) as opened:
+                source_format = (opened.format or "").upper()
+                if source_format not in ALLOWED_MANUAL_FORMATS:
+                    raise InvalidCoverImage(
+                        "Formato no admitido. Usa PNG, JPG/JPEG o WEBP."
+                    )
+                opened.load()
+                source_size = opened.size
+                if (
+                    source_size[0] < MIN_MANUAL_SIZE[0]
+                    or source_size[1] < MIN_MANUAL_SIZE[1]
+                ):
+                    raise InvalidCoverImage(
+                        "La portada debe medir al menos "
+                        f"{MIN_MANUAL_SIZE[0]}x{MIN_MANUAL_SIZE[1]} px"
+                    )
+                prepared = _prepare_cover_image(opened)
+    except InvalidCoverImage:
+        raise
+    except (UnidentifiedImageError, OSError, ValueError) as exc:
+        raise InvalidCoverImage("El archivo no es una imagen válida") from exc
+    except Image.DecompressionBombError as exc:
+        raise InvalidCoverImage("La imagen tiene dimensiones inseguras") from exc
+    except Image.DecompressionBombWarning as exc:
+        raise InvalidCoverImage("La imagen tiene dimensiones inseguras") from exc
+
+    kit = branding.load_brand_kit(brand_id=brand_id)
+    prepared = branding.apply_brand_look(prepared, kit)
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    temporary = destination.with_name(f".{destination.name}.tmp")
+    try:
+        _save_optimized_jpeg(prepared, temporary)
+        os.replace(temporary, destination)
+    finally:
+        temporary.unlink(missing_ok=True)
+
+    logger.info(
+        "Portada manual preparada: %s (brand=%s, source=%dx%d -> %dx%d, %.1f KB)",
+        destination,
+        kit.brand_id,
+        source_size[0],
+        source_size[1],
+        *TARGET_SIZE,
+        destination.stat().st_size / 1024,
+    )
+    return destination
+
+
 def generate_cover_image(
     prompt: str,
     output_dir: Path | None = None,
@@ -69,12 +154,7 @@ def generate_cover_image(
     output_dir = output_dir or config.IMAGES_DIR
     output_dir.mkdir(parents=True, exist_ok=True)
     kit = branding.load_brand_kit(brand_id=brand_id)
-    full_prompt = branding.build_cover_prompt(
-        subject_prompt=prompt,
-        kit=kit,
-        width=TARGET_SIZE[0],
-        height=TARGET_SIZE[1],
-    )
+    full_prompt = build_full_cover_prompt(prompt, brand_id=kit.brand_id)
 
     client = genai.Client(api_key=config.GEMINI_API_KEY)
 

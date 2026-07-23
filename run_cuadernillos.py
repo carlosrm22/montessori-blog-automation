@@ -23,6 +23,7 @@ import time
 
 import config
 import cuadernillo_source as cs
+import manual_image_queue
 import state
 from content import generate_post
 from conversion_funnel import (
@@ -32,7 +33,7 @@ from conversion_funnel import (
 )
 from image_gen import generate_cover_image
 from link_optimizer import sanitize_and_enrich_body
-from notifier import notify_draft_created
+from notifier import notify_draft_created, notify_manual_image_required
 from quality_gate import check_title_novelty
 from search import SearchResult
 from seo_rules import analyze_headline, analyze_truseo
@@ -181,7 +182,46 @@ def _process_one(item: cs.Cuadernillo, dry_run: bool) -> bool:
                          "headline": headline.to_dict()},
             )
 
-    image_path = generate_cover_image(post.image_prompt, brand_id=item.brand_kit)
+    image_path = None
+    if config.IMAGE_WORKFLOW == "manual" and not dry_run:
+        try:
+            job = manual_image_queue.enqueue_manual_image(
+                kind="cuadernillo",
+                source_url=item.pseudo_url,
+                source_title=item.topic_label,
+                source_score=0.0,
+                topic_id=item.topic_id,
+                terminal_status=STATUS_DRAFT,
+                topic_name=item.materia_name,
+                author_name=item.author_name,
+                brand_id=item.brand_kit,
+                post=post,
+                truseo_score=truseo_score,
+                headline_score=headline_score,
+                conversion_intent=decision.intent,
+                commercial_relevance=decision.relevance,
+                destination_url=decision.destination_url,
+            )
+        except manual_image_queue.PendingJobExists as exc:
+            logger.info("No se crea otro paquete de portada: %s", exc)
+            return False
+        notify_manual_image_required(
+            job_id=job["job_id"],
+            title=post.title,
+            alt_text=post.image_alt_text,
+            full_prompt=job["image"]["full_prompt"],
+            expected_path=str(manual_image_queue.expected_input_path(job["job_id"])),
+        )
+        logger.info(
+            "Cuadernillo preservado en la cola manual %s; no se creó borrador todavía.",
+            job["job_id"],
+        )
+        return False
+
+    if config.IMAGE_WORKFLOW == "gemini":
+        image_path = generate_cover_image(post.image_prompt, brand_id=item.brand_kit)
+    else:
+        logger.info("DRY_RUN manual: no se solicita imagen de portada")
 
     if dry_run:
         logger.info("=== DRY_RUN: no se publica ni se marca ===")
@@ -239,6 +279,13 @@ def _process_one(item: cs.Cuadernillo, dry_run: bool) -> bool:
 
 
 def run(limit: int, materia: str = "", author_only: str = "", dry_run: bool = False) -> int:
+    pending_ids = manual_image_queue.pending_job_ids() if not dry_run else []
+    if pending_ids:
+        logger.info(
+            "Hay una portada manual pendiente (%s). No se genera otro cuadernillo.",
+            pending_ids[0],
+        )
+        return 0
     pending = cs.iter_cuadernillos(only_pending=True)
     if materia:
         pending = [c for c in pending if c.materia_id == materia]
@@ -262,6 +309,9 @@ def run(limit: int, materia: str = "", author_only: str = "", dry_run: bool = Fa
                 created += 1
         except Exception:
             logger.exception("Error procesando %s", item.pseudo_url)
+        if not dry_run and manual_image_queue.has_pending_job():
+            logger.info("La corrida se detiene después de crear el paquete manual.")
+            break
         if i < len(pending) - 1 and config.CUADERNILLOS_THROTTLE_SECONDS > 0:
             time.sleep(config.CUADERNILLOS_THROTTLE_SECONDS)
 

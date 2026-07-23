@@ -1,4 +1,5 @@
 import unittest
+from pathlib import Path
 
 from unittest.mock import patch
 
@@ -68,6 +69,39 @@ class NotifierConversionTests(unittest.TestCase):
         self.assertIn("falló", rendered_logs)
         self.assertIn("canales configurados", rendered_logs)
         self.assertNotIn("no hay canal", rendered_logs)
+
+    def test_manual_message_contains_exact_prompt_path_and_project_command(self):
+        prompt = "PROMPT EXACTO\ncon segunda línea"
+        with patch.object(notifier.config, "BASE_DIR", Path("/srv/montessori")):
+            message = notifier._build_manual_image_message(
+                job_id="img-20260722-120000-1234abcd",
+                title="Observación Montessori",
+                alt_text="Guía en un ambiente preparado",
+                full_prompt=prompt,
+                expected_path="/srv/montessori/data/manual_image_queue/inbox/job.png",
+            )
+
+        self.assertIn(prompt, message)
+        self.assertIn("Texto alternativo: Guía en un ambiente preparado", message)
+        self.assertIn(
+            "/srv/montessori/process_manual_cover.sh img-20260722-120000-1234abcd",
+            message,
+        )
+
+    @patch("notifier._post_json", return_value=True)
+    def test_telegram_chunks_preserve_long_prompt_without_truncation(self, post_json):
+        message = "inicio\n" + ("abc123" * 1500) + "\nfin"
+        with patch.multiple(
+            notifier.config,
+            TELEGRAM_BOT_TOKEN="token",
+            TELEGRAM_CHAT_ID="chat",
+        ):
+            self.assertTrue(notifier._send_telegram(message))
+
+        chunks = [call.args[1]["text"] for call in post_json.call_args_list]
+        self.assertGreater(len(chunks), 1)
+        self.assertTrue(all(len(chunk) <= 3900 for chunk in chunks))
+        self.assertEqual("".join(chunks), message)
 
 
 if __name__ == "__main__":

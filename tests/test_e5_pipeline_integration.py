@@ -95,6 +95,7 @@ def _config_patch(quality_count=6, gallery_count=2):
         SEO_STRICT_PHRASE=False,
         WP_SITE_DOMAIN="montessorimexico.org",
         WP_SITE_URL="https://montessorimexico.org",
+        IMAGE_WORKFLOW="gemini",
         REQUIRE_FEATURED_IMAGE=True,
         DRY_RUN=False,
         NOTIFICATIONS_ENABLED=True,
@@ -444,6 +445,179 @@ class E5PipelineIntegrationTests(unittest.TestCase):
                 "notify_failed",
             ],
         )
+
+    def test_main_manual_workflow_queues_complete_package_before_wordpress(self):
+        article = SearchResult(
+            title="Fuente editorial",
+            url="https://source.example.test/manual-cover",
+            snippet="Resumen",
+        )
+        post = _post()
+        job = {
+            "job_id": "img-20260722-120000-1234abcd",
+            "image": {"full_prompt": "PROMPT EXACTO"},
+        }
+        expected_path = Path("/tmp/img-20260722-120000-1234abcd.png")
+
+        with ExitStack() as stack:
+            stack.enter_context(_config_patch())
+            stack.enter_context(patch.object(config, "IMAGE_WORKFLOW", "manual"))
+            stack.enter_context(patch.object(config, "LOCAL_SEO_RULES_ENABLED", False))
+            stack.enter_context(patch.object(main, "search_all", return_value=[article]))
+            stack.enter_context(
+                patch.object(main, "select_best", return_value=(article, 0.91))
+            )
+            stack.enter_context(patch.object(main, "enrich_article", return_value=article))
+            stack.enter_context(patch.object(main, "generate_post", return_value=post))
+            stack.enter_context(
+                patch.object(main, "list_recent_published_posts", return_value=[])
+            )
+            stack.enter_context(
+                patch.object(
+                    main,
+                    "strip_uncontrolled_commercial_links",
+                    side_effect=lambda html: (html, 0),
+                )
+            )
+            stack.enter_context(
+                patch.object(
+                    main,
+                    "sanitize_and_enrich_body",
+                    side_effect=lambda **kwargs: (kwargs["html"], {}),
+                )
+            )
+            stack.enter_context(
+                patch.object(
+                    main,
+                    "apply_conversion_funnel",
+                    side_effect=lambda html, decision: (html, {}),
+                )
+            )
+            enqueue = stack.enter_context(
+                patch.object(
+                    main.manual_image_queue,
+                    "enqueue_manual_image",
+                    return_value=job,
+                )
+            )
+            stack.enter_context(
+                patch.object(
+                    main.manual_image_queue,
+                    "expected_input_path",
+                    return_value=expected_path,
+                )
+            )
+            notified = stack.enter_context(
+                patch.object(main, "notify_manual_image_required")
+            )
+            image = stack.enter_context(patch.object(main, "generate_cover_image"))
+            upload = stack.enter_context(patch.object(main, "upload_media"))
+            draft = stack.enter_context(patch.object(main, "create_draft"))
+            marked = stack.enter_context(patch.object(main.state, "mark_processed"))
+
+            result = main.run_topic_pipeline(_topic())
+
+        self.assertFalse(result)
+        self.assertEqual(enqueue.call_args.kwargs["post"], post)
+        self.assertEqual(enqueue.call_args.kwargs["kind"], "article")
+        notified.assert_called_once_with(
+            job_id=job["job_id"],
+            title=post.title,
+            alt_text=post.image_alt_text,
+            full_prompt="PROMPT EXACTO",
+            expected_path=str(expected_path),
+        )
+        image.assert_not_called()
+        upload.assert_not_called()
+        draft.assert_not_called()
+        marked.assert_not_called()
+
+    def test_cuadernillo_manual_workflow_queues_before_wordpress(self):
+        item = _cuadernillo()
+        post = _post()
+        job = {
+            "job_id": "img-20260722-120001-1234abcd",
+            "image": {"full_prompt": "PROMPT CUADERNILLO"},
+        }
+        expected_path = Path("/tmp/img-20260722-120001-1234abcd.png")
+
+        with ExitStack() as stack:
+            stack.enter_context(_config_patch())
+            stack.enter_context(patch.object(config, "IMAGE_WORKFLOW", "manual"))
+            stack.enter_context(patch.object(config, "LOCAL_SEO_RULES_ENABLED", False))
+            stack.enter_context(
+                patch.object(run_cuadernillos, "generate_post", return_value=post)
+            )
+            stack.enter_context(
+                patch.object(
+                    run_cuadernillos,
+                    "list_recent_published_posts",
+                    return_value=[],
+                )
+            )
+            stack.enter_context(
+                patch.object(
+                    run_cuadernillos,
+                    "strip_uncontrolled_commercial_links",
+                    side_effect=lambda html: (html, 0),
+                )
+            )
+            stack.enter_context(
+                patch.object(
+                    run_cuadernillos,
+                    "sanitize_and_enrich_body",
+                    side_effect=lambda **kwargs: (kwargs["html"], {}),
+                )
+            )
+            stack.enter_context(
+                patch.object(
+                    run_cuadernillos,
+                    "apply_conversion_funnel",
+                    side_effect=lambda html, decision: (html, {}),
+                )
+            )
+            enqueue = stack.enter_context(
+                patch.object(
+                    run_cuadernillos.manual_image_queue,
+                    "enqueue_manual_image",
+                    return_value=job,
+                )
+            )
+            stack.enter_context(
+                patch.object(
+                    run_cuadernillos.manual_image_queue,
+                    "expected_input_path",
+                    return_value=expected_path,
+                )
+            )
+            notified = stack.enter_context(
+                patch.object(run_cuadernillos, "notify_manual_image_required")
+            )
+            image = stack.enter_context(
+                patch.object(run_cuadernillos, "generate_cover_image")
+            )
+            upload = stack.enter_context(patch.object(run_cuadernillos, "upload_media"))
+            draft = stack.enter_context(patch.object(run_cuadernillos, "create_draft"))
+            marked = stack.enter_context(
+                patch.object(run_cuadernillos.state, "mark_processed")
+            )
+
+            result = run_cuadernillos._process_one(item, dry_run=False)
+
+        self.assertFalse(result)
+        self.assertEqual(enqueue.call_args.kwargs["post"], post)
+        self.assertEqual(enqueue.call_args.kwargs["kind"], "cuadernillo")
+        notified.assert_called_once_with(
+            job_id=job["job_id"],
+            title=post.title,
+            alt_text=post.image_alt_text,
+            full_prompt="PROMPT CUADERNILLO",
+            expected_path=str(expected_path),
+        )
+        image.assert_not_called()
+        upload.assert_not_called()
+        draft.assert_not_called()
+        marked.assert_not_called()
 
     def test_main_required_image_failure_stops_before_wordpress_and_remains_retryable(self):
         article = SearchResult(

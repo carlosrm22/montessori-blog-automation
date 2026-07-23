@@ -61,12 +61,12 @@ def _build_message(
     return "\n".join(lines)
 
 
-def _send_webhook(message: str, payload: dict) -> bool:
+def _send_webhook(message: str, payload: dict, event: str = "draft_created") -> bool:
     if not config.NOTIFY_WEBHOOK_URL:
         return False
     sent = _post_json(
         config.NOTIFY_WEBHOOK_URL,
-        {"text": message, "event": "draft_created", **payload},
+        {"text": message, "event": event, **payload},
     )
     if sent:
         logger.info("Notificación enviada por webhook.")
@@ -77,17 +77,51 @@ def _send_telegram(message: str) -> bool:
     if not config.TELEGRAM_BOT_TOKEN or not config.TELEGRAM_CHAT_ID:
         return False
     url = f"https://api.telegram.org/bot{config.TELEGRAM_BOT_TOKEN}/sendMessage"
-    sent = _post_json(
-        url,
-        {
-            "chat_id": config.TELEGRAM_CHAT_ID,
-            "text": message,
-            "disable_web_page_preview": True,
-        },
-    )
+    # Telegram accepts at most 4096 characters. Exact prompt characters are
+    # preserved across chunks so a long prompt is never silently truncated.
+    chunks = [message[index : index + 3900] for index in range(0, len(message), 3900)]
+    sent = True
+    for chunk in chunks or [""]:
+        sent = _post_json(
+            url,
+            {
+                "chat_id": config.TELEGRAM_CHAT_ID,
+                "text": chunk,
+                "disable_web_page_preview": True,
+            },
+        ) and sent
+        if not sent:
+            break
     if sent:
         logger.info("Notificación enviada por Telegram.")
     return sent
+
+
+def _build_manual_image_message(
+    *,
+    job_id: str,
+    title: str,
+    alt_text: str,
+    full_prompt: str,
+    expected_path: str,
+) -> str:
+    return "\n".join(
+        [
+            "Portada manual pendiente",
+            f"ID: {job_id}",
+            f"Título: {title}",
+            f"Texto alternativo: {alt_text}",
+            "",
+            "PROMPT EXACTO PARA CHATGPT:",
+            full_prompt,
+            "",
+            "Guarda la imagen PNG, JPG o WEBP con este nombre:",
+            expected_path,
+            "",
+            "Después ejecuta:",
+            f"{config.BASE_DIR / 'process_manual_cover.sh'} {job_id}",
+        ]
+    )
 
 
 def notify_draft_created(
@@ -146,4 +180,51 @@ def notify_draft_created(
             logger.info(
                 "Borrador creado, pero no hay canal de notificación configurado. "
                 "Define NOTIFY_WEBHOOK_URL o TELEGRAM_BOT_TOKEN+TELEGRAM_CHAT_ID."
+            )
+
+
+def notify_manual_image_required(
+    *,
+    job_id: str,
+    title: str,
+    alt_text: str,
+    full_prompt: str,
+    expected_path: str,
+) -> None:
+    """Notify that a complete article package is waiting for its cover."""
+    if not config.NOTIFICATIONS_ENABLED:
+        return
+
+    message = _build_manual_image_message(
+        job_id=job_id,
+        title=title,
+        alt_text=alt_text,
+        full_prompt=full_prompt,
+        expected_path=expected_path,
+    )
+    payload = {
+        "job_id": job_id,
+        "title": title,
+        "alt_text": alt_text,
+        "full_prompt": full_prompt,
+        "expected_path": expected_path,
+    }
+    channel_configured = bool(config.NOTIFY_WEBHOOK_URL) or bool(
+        config.TELEGRAM_BOT_TOKEN and config.TELEGRAM_CHAT_ID
+    )
+    sent = False
+    sent = _send_webhook(
+        message,
+        payload,
+        event="manual_image_required",
+    ) or sent
+    sent = _send_telegram(message) or sent
+    if not sent:
+        if channel_configured:
+            logger.warning(
+                "Trabajo manual creado, pero falló la entrega por todos los canales."
+            )
+        else:
+            logger.info(
+                "Trabajo manual creado sin canal de notificación configurado."
             )
