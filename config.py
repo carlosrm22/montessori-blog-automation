@@ -273,7 +273,7 @@ MIN_USABILITY_SCORE = float(os.environ.get("MIN_USABILITY_SCORE", "0.6"))
 MIN_BODY_WORDS = int(os.environ.get("MIN_BODY_WORDS", "600"))
 DRY_RUN = os.environ.get("DRY_RUN", "0") == "1"
 _LEGACY_GEMINI_TEXT_MODEL = os.environ.get("GEMINI_TEXT_MODEL", "").strip()
-GEMINI_TEXT_MODEL = _LEGACY_GEMINI_TEXT_MODEL or "gemini-3.5-flash"
+GEMINI_TEXT_MODEL = _LEGACY_GEMINI_TEXT_MODEL or "gemini-3.6-flash"
 GEMINI_SCORER_MODEL = (
     os.environ.get("GEMINI_SCORER_MODEL", "").strip()
     or _LEGACY_GEMINI_TEXT_MODEL
@@ -282,7 +282,7 @@ GEMINI_SCORER_MODEL = (
 GEMINI_CONTENT_MODEL = (
     os.environ.get("GEMINI_CONTENT_MODEL", "").strip()
     or _LEGACY_GEMINI_TEXT_MODEL
-    or "gemini-3.5-flash"
+    or "gemini-3.6-flash"
 )
 GEMINI_CONTENT_TIMEOUT_SECONDS = float(
     os.environ.get("GEMINI_CONTENT_TIMEOUT_SECONDS", "120")
