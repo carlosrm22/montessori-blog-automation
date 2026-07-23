@@ -267,6 +267,7 @@ SCORER_MIN_INTERVAL_SECONDS = float(
 GEMINI_IMAGE_MODEL = (
     os.environ.get("GEMINI_IMAGE_MODEL", "").strip() or "gemini-2.5-flash-image"
 )
+REQUIRE_FEATURED_IMAGE = os.environ.get("REQUIRE_FEATURED_IMAGE", "1") == "1"
 AIOSEO_SYNC = os.environ.get("AIOSEO_SYNC", "0") == "1"
 LOCAL_SEO_RULES_ENABLED = os.environ.get("LOCAL_SEO_RULES_ENABLED", "1") == "1"
 TRUSEO_MIN_SCORE = int(os.environ.get("TRUSEO_MIN_SCORE", "70"))

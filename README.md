@@ -72,6 +72,7 @@ Variables principales:
 - `GEMINI_CONTENT_MODEL`: modelo para generación de artículos (default `gemini-3.5-flash`, o `GEMINI_TEXT_MODEL` si está definido).
 - `SCORER_MIN_INTERVAL_SECONDS`: separación mínima entre evaluaciones Gemini; `4.1` respeta el límite gratuito de 15 solicitudes por minuto (`0` desactiva el ritmo).
 - `GEMINI_IMAGE_MODEL`: modelo para portada (default `gemini-2.5-flash-image`).
+- `REQUIRE_FEATURED_IMAGE`: `1` bloquea la creación del borrador si Gemini no genera la portada o WordPress no acepta su subida (default y recomendado); `0` permite borradores sin imagen destacada.
 - `AIOSEO_SYNC`: `1` para sincronizar title/description/OG/Twitter en AIOSEO (opcional, default `0`).
 - `LOCAL_SEO_RULES_ENABLED`: habilita evaluación SEO local (`1` por defecto).
 - `TRUSEO_MIN_SCORE`: mínimo TruSEO-like para publicar automáticamente (default `70`).

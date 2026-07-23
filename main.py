@@ -353,6 +353,13 @@ def run_topic_pipeline(topic: TopicProfile) -> bool:
         )
         return True
 
+    if config.REQUIRE_FEATURED_IMAGE and not image_path:
+        logger.error(
+            "Publicación bloqueada: no se generó la imagen destacada requerida. "
+            "La fuente queda disponible para un reintento."
+        )
+        return False
+
     logger.info("=== Paso 5: Publicación en WordPress (borrador) ===")
     media_id = None
     if image_path:
@@ -364,6 +371,12 @@ def run_topic_pipeline(topic: TopicProfile) -> bool:
             description=post.seo_description or post.excerpt,
         )
         if media_id is None:
+            if config.REQUIRE_FEATURED_IMAGE:
+                logger.error(
+                    "Publicación bloqueada: WordPress no aceptó la imagen destacada. "
+                    "La fuente queda disponible para un reintento."
+                )
+                return False
             logger.warning("No se pudo subir la imagen, continuando sin imagen destacada")
 
     post_id = create_draft(post, media_id=media_id, author_name=topic.author_name)

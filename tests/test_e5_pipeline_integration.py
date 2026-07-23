@@ -95,6 +95,7 @@ def _config_patch(quality_count=6, gallery_count=2):
         SEO_STRICT_PHRASE=False,
         WP_SITE_DOMAIN="montessorimexico.org",
         WP_SITE_URL="https://montessorimexico.org",
+        REQUIRE_FEATURED_IMAGE=True,
         DRY_RUN=False,
         NOTIFICATIONS_ENABLED=True,
         NOTIFY_WEBHOOK_URL="https://hooks.example.test/draft",
@@ -443,6 +444,240 @@ class E5PipelineIntegrationTests(unittest.TestCase):
                 "notify_failed",
             ],
         )
+
+    def test_main_required_image_failure_stops_before_wordpress_and_remains_retryable(self):
+        article = SearchResult(
+            title="Fuente editorial",
+            url="https://source.example.test/image-failure",
+            snippet="Resumen",
+        )
+        with ExitStack() as stack:
+            stack.enter_context(_config_patch())
+            stack.enter_context(
+                patch.object(config, "LOCAL_SEO_RULES_ENABLED", False)
+            )
+            stack.enter_context(patch.object(main, "search_all", return_value=[article]))
+            stack.enter_context(
+                patch.object(main, "select_best", return_value=(article, 0.91))
+            )
+            stack.enter_context(patch.object(main, "enrich_article", return_value=article))
+            stack.enter_context(patch.object(main, "generate_post", return_value=_post()))
+            stack.enter_context(
+                patch.object(main, "list_recent_published_posts", return_value=[])
+            )
+            stack.enter_context(
+                patch.object(
+                    main,
+                    "strip_uncontrolled_commercial_links",
+                    side_effect=lambda html: (html, 0),
+                )
+            )
+            stack.enter_context(
+                patch.object(
+                    main,
+                    "sanitize_and_enrich_body",
+                    side_effect=lambda **kwargs: (kwargs["html"], {}),
+                )
+            )
+            stack.enter_context(
+                patch.object(
+                    main,
+                    "apply_conversion_funnel",
+                    side_effect=lambda html, decision: (html, {}),
+                )
+            )
+            stack.enter_context(
+                patch.object(main, "generate_cover_image", return_value=None)
+            )
+            upload = stack.enter_context(patch.object(main, "upload_media"))
+            draft = stack.enter_context(patch.object(main, "create_draft"))
+            marked = stack.enter_context(patch.object(main.state, "mark_processed"))
+
+            result = main.run_topic_pipeline(_topic())
+
+        self.assertFalse(result)
+        upload.assert_not_called()
+        draft.assert_not_called()
+        marked.assert_not_called()
+
+    def test_main_required_image_upload_failure_stops_before_draft(self):
+        article = SearchResult(
+            title="Fuente editorial",
+            url="https://source.example.test/image-upload-failure",
+            snippet="Resumen",
+        )
+        with ExitStack() as stack:
+            stack.enter_context(_config_patch())
+            stack.enter_context(
+                patch.object(config, "LOCAL_SEO_RULES_ENABLED", False)
+            )
+            stack.enter_context(patch.object(main, "search_all", return_value=[article]))
+            stack.enter_context(
+                patch.object(main, "select_best", return_value=(article, 0.91))
+            )
+            stack.enter_context(patch.object(main, "enrich_article", return_value=article))
+            stack.enter_context(patch.object(main, "generate_post", return_value=_post()))
+            stack.enter_context(
+                patch.object(main, "list_recent_published_posts", return_value=[])
+            )
+            stack.enter_context(
+                patch.object(
+                    main,
+                    "strip_uncontrolled_commercial_links",
+                    side_effect=lambda html: (html, 0),
+                )
+            )
+            stack.enter_context(
+                patch.object(
+                    main,
+                    "sanitize_and_enrich_body",
+                    side_effect=lambda **kwargs: (kwargs["html"], {}),
+                )
+            )
+            stack.enter_context(
+                patch.object(
+                    main,
+                    "apply_conversion_funnel",
+                    side_effect=lambda html, decision: (html, {}),
+                )
+            )
+            stack.enter_context(
+                patch.object(
+                    main,
+                    "generate_cover_image",
+                    return_value=Path("/tmp/e5-cover.jpg"),
+                )
+            )
+            upload = stack.enter_context(
+                patch.object(main, "upload_media", return_value=None)
+            )
+            draft = stack.enter_context(patch.object(main, "create_draft"))
+            marked = stack.enter_context(patch.object(main.state, "mark_processed"))
+
+            result = main.run_topic_pipeline(_topic())
+
+        self.assertFalse(result)
+        upload.assert_called_once()
+        draft.assert_not_called()
+        marked.assert_not_called()
+
+    def test_cuadernillo_required_image_failure_stays_pending(self):
+        with ExitStack() as stack:
+            stack.enter_context(_config_patch())
+            stack.enter_context(
+                patch.object(config, "LOCAL_SEO_RULES_ENABLED", False)
+            )
+            stack.enter_context(
+                patch.object(run_cuadernillos, "generate_post", return_value=_post())
+            )
+            stack.enter_context(
+                patch.object(
+                    run_cuadernillos,
+                    "list_recent_published_posts",
+                    return_value=[],
+                )
+            )
+            stack.enter_context(
+                patch.object(
+                    run_cuadernillos,
+                    "strip_uncontrolled_commercial_links",
+                    side_effect=lambda html: (html, 0),
+                )
+            )
+            stack.enter_context(
+                patch.object(
+                    run_cuadernillos,
+                    "sanitize_and_enrich_body",
+                    side_effect=lambda **kwargs: (kwargs["html"], {}),
+                )
+            )
+            stack.enter_context(
+                patch.object(
+                    run_cuadernillos,
+                    "apply_conversion_funnel",
+                    side_effect=lambda html, decision: (html, {}),
+                )
+            )
+            stack.enter_context(
+                patch.object(run_cuadernillos, "generate_cover_image", return_value=None)
+            )
+            upload = stack.enter_context(
+                patch.object(run_cuadernillos, "upload_media")
+            )
+            draft = stack.enter_context(
+                patch.object(run_cuadernillos, "create_draft")
+            )
+            marked = stack.enter_context(
+                patch.object(run_cuadernillos.state, "mark_processed")
+            )
+
+            result = run_cuadernillos._process_one(_cuadernillo(), dry_run=False)
+
+        self.assertFalse(result)
+        upload.assert_not_called()
+        draft.assert_not_called()
+        marked.assert_not_called()
+
+    def test_cuadernillo_required_image_upload_failure_stops_before_draft(self):
+        with ExitStack() as stack:
+            stack.enter_context(_config_patch())
+            stack.enter_context(
+                patch.object(config, "LOCAL_SEO_RULES_ENABLED", False)
+            )
+            stack.enter_context(
+                patch.object(run_cuadernillos, "generate_post", return_value=_post())
+            )
+            stack.enter_context(
+                patch.object(
+                    run_cuadernillos,
+                    "list_recent_published_posts",
+                    return_value=[],
+                )
+            )
+            stack.enter_context(
+                patch.object(
+                    run_cuadernillos,
+                    "strip_uncontrolled_commercial_links",
+                    side_effect=lambda html: (html, 0),
+                )
+            )
+            stack.enter_context(
+                patch.object(
+                    run_cuadernillos,
+                    "sanitize_and_enrich_body",
+                    side_effect=lambda **kwargs: (kwargs["html"], {}),
+                )
+            )
+            stack.enter_context(
+                patch.object(
+                    run_cuadernillos,
+                    "apply_conversion_funnel",
+                    side_effect=lambda html, decision: (html, {}),
+                )
+            )
+            stack.enter_context(
+                patch.object(
+                    run_cuadernillos,
+                    "generate_cover_image",
+                    return_value=Path("/tmp/e5-cover.jpg"),
+                )
+            )
+            upload = stack.enter_context(
+                patch.object(run_cuadernillos, "upload_media", return_value=None)
+            )
+            draft = stack.enter_context(
+                patch.object(run_cuadernillos, "create_draft")
+            )
+            marked = stack.enter_context(
+                patch.object(run_cuadernillos.state, "mark_processed")
+            )
+
+            result = run_cuadernillos._process_one(_cuadernillo(), dry_run=False)
+
+        self.assertFalse(result)
+        upload.assert_called_once()
+        draft.assert_not_called()
+        marked.assert_not_called()
 
     def test_main_novelty_rejection_stops_before_side_effects(self):
         article = SearchResult(

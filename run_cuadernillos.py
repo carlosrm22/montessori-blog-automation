@@ -189,6 +189,14 @@ def _process_one(item: cs.Cuadernillo, dry_run: bool) -> bool:
         logger.info("Categorías: %s | Imagen: %s", post.categories, image_path)
         return True
 
+    if config.REQUIRE_FEATURED_IMAGE and not image_path:
+        logger.error(
+            "Publicación bloqueada: no se generó la imagen destacada requerida para %s. "
+            "El cuadernillo queda pendiente para un reintento.",
+            item.pseudo_url,
+        )
+        return False
+
     media_id = None
     if image_path:
         media_id = upload_media(
@@ -196,6 +204,13 @@ def _process_one(item: cs.Cuadernillo, dry_run: bool) -> bool:
             caption=post.excerpt or post.title,
             description=post.seo_description or post.excerpt,
         )
+        if media_id is None and config.REQUIRE_FEATURED_IMAGE:
+            logger.error(
+                "Publicación bloqueada: WordPress no aceptó la imagen destacada para %s. "
+                "El cuadernillo queda pendiente para un reintento.",
+                item.pseudo_url,
+            )
+            return False
 
     post_id = create_draft(post, media_id=media_id, author_name=item.author_name)
     if post_id is None:
