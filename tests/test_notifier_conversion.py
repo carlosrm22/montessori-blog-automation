@@ -8,9 +8,9 @@ from notifier import _build_message, _post_json
 
 
 class NotifierConversionTests(unittest.TestCase):
-    @patch("notifier._send_telegram", return_value=True)
+    @patch("notifier._send_whatsapp", return_value=True)
     @patch("notifier._send_webhook", return_value=False)
-    def test_weekly_digest_uses_existing_channels(self, webhook, telegram):
+    def test_weekly_digest_uses_existing_channels(self, webhook, whatsapp):
         with patch.multiple(
             notifier.config,
             NOTIFICATIONS_ENABLED=True,
@@ -22,9 +22,9 @@ class NotifierConversionTests(unittest.TestCase):
                 message="resumen",
                 posts=[{"id": 7, "title": "Tema", "url": "https://example.test"}],
                 period_label="1 al 5 de septiembre de 2026",
-            )
+        )
         self.assertTrue(sent)
-        telegram.assert_called_once_with("resumen")
+        whatsapp.assert_called_once_with("resumen")
 
     def test_message_includes_controlled_decision(self):
         message = _build_message(

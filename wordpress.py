@@ -554,6 +554,19 @@ def list_recent_published_posts(limit: int = 6, exclude_ids: set[int] | None = N
 
         image_url = ""
         image_alt = ""
+        excerpt_data = item.get("excerpt", {})
+        if not isinstance(excerpt_data, dict):
+            raise RecentPostsUnavailable(
+                "WordPress recent-post history has an invalid response shape"
+            )
+        rendered_excerpt = excerpt_data.get("rendered", "")
+        if not isinstance(rendered_excerpt, str):
+            raise RecentPostsUnavailable(
+                "WordPress recent-post history has an invalid response shape"
+            )
+        description = unescape(re.sub(r"<[^>]+>", " ", rendered_excerpt))
+        description = re.sub(r"\s+", " ", description).strip()
+        description = re.sub(r"\s+([.,;:!?])", r"\1", description)
         embedded = item.get("_embedded", {})
         if not isinstance(embedded, dict):
             raise RecentPostsUnavailable(
@@ -578,6 +591,7 @@ def list_recent_published_posts(limit: int = 6, exclude_ids: set[int] | None = N
                 "id": post_id,
                 "url": link,
                 "title": title,
+                "description": description,
                 "image_url": image_url,
                 "image_alt": image_alt,
             }

@@ -2,7 +2,10 @@
 
 from __future__ import annotations
 
+import json
 import logging
+import re
+import subprocess
 import time
 
 import httpx
@@ -10,6 +13,7 @@ import httpx
 import config
 
 logger = logging.getLogger(__name__)
+_WHATSAPP_TARGET_RE = re.compile(r"^\+?\d{8,15}$")
 
 
 def _post_json(url: str, payload: dict, attempts: int = 3) -> bool:
@@ -95,6 +99,74 @@ def _send_telegram(message: str) -> bool:
     if sent:
         logger.info("Notificación enviada por Telegram.")
     return sent
+
+
+def _resolve_whatsapp_target() -> str:
+    configured = config.OPENCLAW_WHATSAPP_TARGET
+    if configured:
+        return configured if _WHATSAPP_TARGET_RE.fullmatch(configured) else ""
+    try:
+        result = subprocess.run(
+            [
+                config.OPENCLAW_CLI,
+                "config",
+                "get",
+                "channels.whatsapp.allowFrom",
+                "--json",
+            ],
+            capture_output=True,
+            text=True,
+            timeout=20,
+            check=False,
+        )
+        values = json.loads(result.stdout) if result.returncode == 0 else []
+    except (OSError, subprocess.SubprocessError, json.JSONDecodeError):
+        return ""
+    if not isinstance(values, list) or len(values) != 1:
+        return ""
+    target = str(values[0]).strip()
+    return target if _WHATSAPP_TARGET_RE.fullmatch(target) else ""
+
+
+def _send_whatsapp(message: str, media_url: str = "") -> bool:
+    """Send a private WhatsApp message without logging its target or payload."""
+    target = _resolve_whatsapp_target()
+    if not target:
+        logger.warning(
+            "WhatsApp no tiene un destinatario único; configura "
+            "OPENCLAW_WHATSAPP_TARGET."
+        )
+        return False
+    command = [
+        config.OPENCLAW_CLI,
+        "message",
+        "send",
+        "--channel",
+        "whatsapp",
+        "--target",
+        target,
+        "--message",
+        message,
+        "--json",
+    ]
+    if media_url:
+        command.extend(["--media", media_url])
+    try:
+        result = subprocess.run(
+            command,
+            capture_output=True,
+            text=True,
+            timeout=90,
+            check=False,
+        )
+    except (OSError, subprocess.SubprocessError) as exc:
+        logger.warning("Falló WhatsApp (%s).", type(exc).__name__)
+        return False
+    if result.returncode != 0:
+        logger.warning("Falló WhatsApp (exit=%d).", result.returncode)
+        return False
+    logger.info("Notificación enviada por WhatsApp.")
+    return True
 
 
 def _build_manual_image_message(
@@ -251,18 +323,27 @@ def notify_weekly_digest(
             for item in posts
         ],
     }
-    channel_configured = bool(config.NOTIFY_WEBHOOK_URL) or bool(
-        config.TELEGRAM_BOT_TOKEN and config.TELEGRAM_CHAT_ID
-    )
-    if not channel_configured:
-        logger.warning("Resumen semanal no enviado: no hay canal configurado.")
-        return False
-
     sent = False
     sent = _send_webhook(message, payload, event="weekly_digest") or sent
-    sent = _send_telegram(message) or sent
+    sent = _send_whatsapp(message) or sent
     if sent:
         logger.info("Resumen semanal enviado (%d publicaciones).", len(posts))
     else:
         logger.warning("Falló la entrega del resumen semanal por todos los canales.")
+    return sent
+
+
+def notify_daily_status_suggestion(
+    *, message: str, image_url: str, post: dict
+) -> bool:
+    """Send one share-ready daily post privately through WhatsApp."""
+    if not config.NOTIFICATIONS_ENABLED:
+        logger.warning("Sugerencia diaria no enviada: notificaciones desactivadas.")
+        return False
+    sent = _send_whatsapp(message, media_url=image_url)
+    if sent:
+        logger.info(
+            "Sugerencia diaria enviada por WhatsApp (post_id=%s).",
+            post.get("id"),
+        )
     return sent

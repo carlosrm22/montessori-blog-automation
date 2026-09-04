@@ -88,6 +88,8 @@ Variables principales:
 - `NOTIFICATIONS_ENABLED`: activa avisos al crear borradores (default `1`).
 - `NOTIFY_WEBHOOK_URL`: webhook para recibir alertas (Slack/Discord/Make/n8n, opcional).
 - `TELEGRAM_BOT_TOKEN` y `TELEGRAM_CHAT_ID`: canal alterno de alertas por Telegram.
+- `OPENCLAW_CLI`: ejecutable de OpenClaw usado para entregar mensajes por WhatsApp (default `openclaw`).
+- `OPENCLAW_WHATSAPP_TARGET`: destinatario E.164 opcional; vacío usa el único contacto permitido del canal WhatsApp.
 - `WEEKLY_DIGEST_TIMEZONE`: zona horaria del resumen semanal (default `America/Mexico_City`).
 - `WEEKLY_DIGEST_DESCRIPTION_MAX_LEN`: longitud máxima de cada descripción del resumen (default `160`).
 - `POST_TITLE_MAX_LEN`: máximo de caracteres para el título del post (default `60`).
@@ -230,7 +232,8 @@ python report_seo.py --topic-id educacion_humanista
 Cada viernes se consultan en WordPress las entradas realmente publicadas desde el
 lunes a las 00:00. El mensaje incluye título, descripción breve y liga, usando
 formato compatible con WhatsApp para copiarlo y compartirlo en el grupo escolar.
-Se entrega por los canales de notificación existentes (Telegram y/o webhook).
+Se entrega directamente por el canal WhatsApp enlazado en OpenClaw y,
+opcionalmente, también al webhook configurado.
 
 Prueba local sin enviar mensajes:
 
@@ -238,7 +241,7 @@ Prueba local sin enviar mensajes:
 ./.venv/bin/python weekly_digest.py --dry-run
 ```
 
-Envío manual real usando Telegram/webhook configurados:
+Envío manual real usando WhatsApp/webhook configurados:
 
 ```bash
 ./run_weekly_digest.sh
@@ -260,6 +263,29 @@ Descripción breve de la entrada.
 La unidad `systemd/montessori-weekly-digest.timer` lo ejecuta los viernes a las
 09:00, hora de Ciudad de México. Si no hubo publicaciones, envía una nota breve.
 
+### Sugerencia diaria para Estado de WhatsApp
+
+Todos los días se elige una publicación reciente distinta y se envía por mensaje
+privado de WhatsApp con portada, título, gancho breve y liga. La persona solo
+tiene que compartirla manualmente en su Estado. El historial se guarda en SQLite
+para no repetir publicaciones hasta agotar el catálogo reciente; después se
+reutiliza primero la que lleva más tiempo sin aparecer.
+
+Prueba sin enviar ni registrar:
+
+```bash
+./.venv/bin/python daily_status_suggestion.py --dry-run
+```
+
+Envío manual real:
+
+```bash
+./run_daily_status.sh
+```
+
+La unidad `systemd/montessori-daily-status.timer` se ejecuta diariamente a las
+09:15, hora de Ciudad de México.
+
 ## Modo seguro (recomendado al inicio)
 
 Ejecuta primero en simulación para validar prompts y scoring:
@@ -275,7 +301,8 @@ En este modo no publica en WordPress, pero sí ejecuta búsqueda, evaluación, g
 Recomendación: correr diario y combinar cadencia con un colchón mínimo de borradores.
 Con `MIN_DRAFT_BUFFER=2` y `PUBLISH_INTERVAL_DAYS=1`, el sistema intentará mantener al menos dos borradores activos y nunca publicará más de una vez al día salvo que ajustes también el límite por corrida.
 
-El repositorio incluye units listos para `systemd --user` en `systemd/montessori-blog.service` y `systemd/montessori-blog.timer`.
+El repositorio incluye units `systemd --user` para el pipeline editorial, el
+resumen semanal y la sugerencia diaria de WhatsApp.
 
 Instalación recomendada:
 
@@ -285,8 +312,11 @@ cp systemd/montessori-blog.service ~/.config/systemd/user/
 cp systemd/montessori-blog.timer ~/.config/systemd/user/
 cp systemd/montessori-weekly-digest.service ~/.config/systemd/user/
 cp systemd/montessori-weekly-digest.timer ~/.config/systemd/user/
+cp systemd/montessori-daily-status.service ~/.config/systemd/user/
+cp systemd/montessori-daily-status.timer ~/.config/systemd/user/
 systemctl --user daemon-reload
-systemctl --user enable --now montessori-blog.timer montessori-weekly-digest.timer
+systemctl --user enable --now montessori-blog.timer montessori-weekly-digest.timer \
+  montessori-daily-status.timer
 loginctl enable-linger "$USER"
 ```
 
@@ -295,9 +325,11 @@ Verificación:
 ```bash
 systemctl --user status montessori-blog.timer
 systemctl --user status montessori-weekly-digest.timer
+systemctl --user status montessori-daily-status.timer
 systemctl --user list-timers --all | grep montessori
 journalctl --user -u montessori-blog.service -n 50 --no-pager
 journalctl --user -u montessori-weekly-digest.service -n 50 --no-pager
+journalctl --user -u montessori-daily-status.service -n 50 --no-pager
 ```
 
 La programación queda diaria a las `08:00` y `Persistent=true` hace que, si la máquina estaba apagada o hibernada a esa hora, la corrida pendiente se ejecute al reanudar o iniciar sesión.
@@ -310,6 +342,7 @@ La programación queda diaria a las `08:00` y `Persistent=true` hace que, si la 
 .
 ├── main.py          # Orquestador del pipeline
 ├── weekly_digest.py # Resumen semanal listo para compartir en WhatsApp
+├── daily_status_suggestion.py # Publicación diaria lista para Estado
 ├── search.py        # Búsqueda de noticias (Brave / Google CSE)
 ├── topics.py        # Carga y validación de perfiles temáticos
 ├── scorer.py        # Scoring de relevancia con Gemini
@@ -331,6 +364,8 @@ La programación queda diaria a las `08:00` y `Persistent=true` hace que, si la 
 ├── systemd/
 │   ├── montessori-blog.service
 │   ├── montessori-blog.timer
+│   ├── montessori-daily-status.service
+│   ├── montessori-daily-status.timer
 │   ├── montessori-weekly-digest.service
 │   └── montessori-weekly-digest.timer
 ├── topics.yml        # Configuración editorial por vertical
@@ -346,6 +381,7 @@ La programación queda diaria a las `08:00` y `Persistent=true` hace que, si la 
 
 - Base de estado: `data/blog_state.db`
 - Reportes SEO locales: tabla `seo_reports` en `data/blog_state.db`
+- Historial de publicaciones sugeridas: tabla `daily_share_history` en `data/blog_state.db`
 - Imágenes: `data/images/`
 - Cola manual de portadas: `data/manual_image_queue/`
 - Logs rotativos: `logs/automation.log`

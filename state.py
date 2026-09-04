@@ -35,12 +35,23 @@ CREATE TABLE IF NOT EXISTS seo_reports (
 )
 """
 
+_CREATE_DAILY_SHARE_HISTORY_TABLE = """
+CREATE TABLE IF NOT EXISTS daily_share_history (
+    post_id INTEGER PRIMARY KEY,
+    url TEXT NOT NULL,
+    title TEXT NOT NULL,
+    last_sent_at TEXT NOT NULL,
+    send_count INTEGER NOT NULL DEFAULT 1
+)
+"""
+
 
 def _connect() -> sqlite3.Connection:
     config.DATA_DIR.mkdir(parents=True, exist_ok=True)
     conn = sqlite3.connect(config.DB_PATH)
     conn.execute(_CREATE_TABLE)
     conn.execute(_CREATE_SEO_REPORTS_TABLE)
+    conn.execute(_CREATE_DAILY_SHARE_HISTORY_TABLE)
     conn.commit()
     return conn
 
@@ -157,6 +168,10 @@ def get_last_published_at(
         row = conn.execute(sql, params).fetchone()
     if not row:
         return None
+    try:
+        return json.loads(str(row[0]))
+    except json.JSONDecodeError:
+        return None
     return _parse_created_at(str(row[0]))
 
 
@@ -243,10 +258,39 @@ def get_seo_report(topic_id: str, url: str) -> dict | None:
         ).fetchone()
     if not row:
         return None
+
+
+def get_daily_share_history() -> dict[int, str]:
+    """Return post IDs and their last successful WhatsApp delivery time."""
+    conn = _connect()
     try:
-        return json.loads(str(row[0]))
-    except json.JSONDecodeError:
-        return None
+        rows = conn.execute(
+            "SELECT post_id, last_sent_at FROM daily_share_history"
+        ).fetchall()
+    finally:
+        conn.close()
+    return {int(post_id): str(last_sent_at) for post_id, last_sent_at in rows}
+
+
+def mark_daily_share_sent(post_id: int, url: str, title: str) -> None:
+    """Record a successful daily suggestion without losing cycle history."""
+    sent_at = datetime.now(timezone.utc).isoformat()
+    conn = _connect()
+    try:
+        conn.execute(
+            """INSERT INTO daily_share_history
+               (post_id, url, title, last_sent_at, send_count)
+               VALUES (?, ?, ?, ?, 1)
+               ON CONFLICT(post_id) DO UPDATE SET
+                   url = excluded.url,
+                   title = excluded.title,
+                   last_sent_at = excluded.last_sent_at,
+                   send_count = daily_share_history.send_count + 1""",
+            (post_id, url, title, sent_at),
+        )
+        conn.commit()
+    finally:
+        conn.close()
 
 
 if __name__ == "__main__":

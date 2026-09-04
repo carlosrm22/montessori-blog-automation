@@ -317,6 +317,10 @@ NOTIFICATIONS_ENABLED = os.environ.get("NOTIFICATIONS_ENABLED", "1") == "1"
 NOTIFY_WEBHOOK_URL = os.environ.get("NOTIFY_WEBHOOK_URL", "").strip()
 TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN", "").strip()
 TELEGRAM_CHAT_ID = os.environ.get("TELEGRAM_CHAT_ID", "").strip()
+OPENCLAW_CLI = os.environ.get("OPENCLAW_CLI", "openclaw").strip()
+OPENCLAW_WHATSAPP_TARGET = os.environ.get(
+    "OPENCLAW_WHATSAPP_TARGET", ""
+).strip()
 WEEKLY_DIGEST_TIMEZONE = os.environ.get(
     "WEEKLY_DIGEST_TIMEZONE", "America/Mexico_City"
 ).strip()
