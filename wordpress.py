@@ -585,6 +585,98 @@ def list_recent_published_posts(limit: int = 6, exclude_ids: set[int] | None = N
     return posts[:limit]
 
 
+def list_published_posts_between(after: str, before: str) -> list[dict]:
+    """Return published posts inside an ISO-8601 interval for weekly digests."""
+    clean_after = " ".join((after or "").split())
+    clean_before = " ".join((before or "").split())
+    if not clean_after or not clean_before:
+        raise RecentPostsUnavailable("WordPress weekly-post interval is invalid")
+
+    resp = _request(
+        "get",
+        "posts",
+        params={
+            "status": "publish",
+            "after": clean_after,
+            "before": clean_before,
+            "orderby": "date",
+            "order": "asc",
+            "per_page": 100,
+            "_fields": "id,link,title,excerpt,date_gmt",
+        },
+        retry_on_500=False,
+    )
+    if resp is None:
+        raise RecentPostsUnavailable("WordPress weekly-post history is unavailable")
+    try:
+        payload = resp.json()
+    except Exception:
+        raise RecentPostsUnavailable(
+            "WordPress weekly-post history could not be parsed"
+        ) from None
+    if not isinstance(payload, list):
+        raise RecentPostsUnavailable(
+            "WordPress weekly-post history has an invalid response shape"
+        )
+
+    posts: list[dict] = []
+    for item in payload:
+        if not isinstance(item, dict):
+            raise RecentPostsUnavailable(
+                "WordPress weekly-post history has an invalid response shape"
+            )
+        post_id = item.get("id")
+        link_value = item.get("link")
+        title_data = item.get("title")
+        excerpt_data = item.get("excerpt", {})
+        if type(post_id) is not int or post_id <= 0:
+            raise RecentPostsUnavailable(
+                "WordPress weekly-post history has an invalid response shape"
+            )
+        if not isinstance(link_value, str) or not link_value.strip():
+            raise RecentPostsUnavailable(
+                "WordPress weekly-post history has an invalid response shape"
+            )
+        if not isinstance(title_data, dict) or not isinstance(
+            title_data.get("rendered"), str
+        ):
+            raise RecentPostsUnavailable(
+                "WordPress weekly-post history has an invalid response shape"
+            )
+        if not isinstance(excerpt_data, dict):
+            raise RecentPostsUnavailable(
+                "WordPress weekly-post history has an invalid response shape"
+            )
+        rendered_excerpt = excerpt_data.get("rendered", "")
+        if not isinstance(rendered_excerpt, str):
+            raise RecentPostsUnavailable(
+                "WordPress weekly-post history has an invalid response shape"
+            )
+
+        title = unescape(
+            re.sub(r"<[^>]+>", "", title_data["rendered"])
+        ).strip()
+        description = unescape(
+            re.sub(r"<[^>]+>", " ", rendered_excerpt)
+        )
+        description = re.sub(r"\s+", " ", description).strip()
+        description = re.sub(r"\s+([.,;:!?])", r"\1", description)
+        if not title:
+            raise RecentPostsUnavailable(
+                "WordPress weekly-post history has an invalid response shape"
+            )
+        posts.append(
+            {
+                "id": post_id,
+                "url": link_value.strip(),
+                "title": title,
+                "description": description,
+                "date_gmt": str(item.get("date_gmt", "")).strip(),
+            }
+        )
+    return posts
+
+
 def create_draft(
     post: GeneratedPost, media_id: int | None = None, author_name: str = ""
 ) -> int | None:

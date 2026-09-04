@@ -228,3 +228,41 @@ def notify_manual_image_required(
             logger.info(
                 "Trabajo manual creado sin canal de notificación configurado."
             )
+
+
+def notify_weekly_digest(
+    *, message: str, posts: list[dict], period_label: str
+) -> bool:
+    """Deliver a WhatsApp-ready weekly digest through configured channels."""
+    if not config.NOTIFICATIONS_ENABLED:
+        logger.warning("Resumen semanal no enviado: notificaciones desactivadas.")
+        return False
+
+    payload = {
+        "period": period_label,
+        "post_count": len(posts),
+        "posts": [
+            {
+                "id": item.get("id"),
+                "title": item.get("title", ""),
+                "description": item.get("description", ""),
+                "url": item.get("url", ""),
+            }
+            for item in posts
+        ],
+    }
+    channel_configured = bool(config.NOTIFY_WEBHOOK_URL) or bool(
+        config.TELEGRAM_BOT_TOKEN and config.TELEGRAM_CHAT_ID
+    )
+    if not channel_configured:
+        logger.warning("Resumen semanal no enviado: no hay canal configurado.")
+        return False
+
+    sent = False
+    sent = _send_webhook(message, payload, event="weekly_digest") or sent
+    sent = _send_telegram(message) or sent
+    if sent:
+        logger.info("Resumen semanal enviado (%d publicaciones).", len(posts))
+    else:
+        logger.warning("Falló la entrega del resumen semanal por todos los canales.")
+    return sent

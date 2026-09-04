@@ -166,6 +166,11 @@ def validate() -> None:
     if HEADLINE_MIN_SCORE < 0 or HEADLINE_MIN_SCORE > 100:
         logging.critical("HEADLINE_MIN_SCORE debe estar entre 0 y 100")
         sys.exit(1)
+    if not 80 <= WEEKLY_DIGEST_DESCRIPTION_MAX_LEN <= 300:
+        logging.critical(
+            "WEEKLY_DIGEST_DESCRIPTION_MAX_LEN debe estar entre 80 y 300"
+        )
+        sys.exit(1)
     if POST_TITLE_MAX_LEN < 40 or POST_TITLE_MAX_LEN > 120:
         logging.critical("POST_TITLE_MAX_LEN debe estar entre 40 y 120")
         sys.exit(1)
@@ -312,6 +317,12 @@ NOTIFICATIONS_ENABLED = os.environ.get("NOTIFICATIONS_ENABLED", "1") == "1"
 NOTIFY_WEBHOOK_URL = os.environ.get("NOTIFY_WEBHOOK_URL", "").strip()
 TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN", "").strip()
 TELEGRAM_CHAT_ID = os.environ.get("TELEGRAM_CHAT_ID", "").strip()
+WEEKLY_DIGEST_TIMEZONE = os.environ.get(
+    "WEEKLY_DIGEST_TIMEZONE", "America/Mexico_City"
+).strip()
+WEEKLY_DIGEST_DESCRIPTION_MAX_LEN = int(
+    os.environ.get("WEEKLY_DIGEST_DESCRIPTION_MAX_LEN", "160")
+)
 POST_TITLE_MAX_LEN = int(os.environ.get("POST_TITLE_MAX_LEN", "60"))
 SEO_TITLE_MAX_LEN = int(os.environ.get("SEO_TITLE_MAX_LEN", "60"))
 SEO_DESCRIPTION_MAX_LEN = int(os.environ.get("SEO_DESCRIPTION_MAX_LEN", "155"))

@@ -1,0 +1,9 @@
+[Unit]
+Description=Montessori Blog Weekly Digest Timer (viernes)
+
+[Timer]
+OnCalendar=Fri *-*-* 09:00:00 America/Mexico_City
+Persistent=true
+
+[Install]
+WantedBy=timers.target

@@ -8,6 +8,24 @@ from notifier import _build_message, _post_json
 
 
 class NotifierConversionTests(unittest.TestCase):
+    @patch("notifier._send_telegram", return_value=True)
+    @patch("notifier._send_webhook", return_value=False)
+    def test_weekly_digest_uses_existing_channels(self, webhook, telegram):
+        with patch.multiple(
+            notifier.config,
+            NOTIFICATIONS_ENABLED=True,
+            NOTIFY_WEBHOOK_URL="",
+            TELEGRAM_BOT_TOKEN="token",
+            TELEGRAM_CHAT_ID="chat",
+        ):
+            sent = notifier.notify_weekly_digest(
+                message="resumen",
+                posts=[{"id": 7, "title": "Tema", "url": "https://example.test"}],
+                period_label="1 al 5 de septiembre de 2026",
+            )
+        self.assertTrue(sent)
+        telegram.assert_called_once_with("resumen")
+
     def test_message_includes_controlled_decision(self):
         message = _build_message(
             post_id=42,
