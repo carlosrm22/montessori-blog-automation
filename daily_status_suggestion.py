@@ -21,7 +21,7 @@ def _clean(value: str) -> str:
     return text.translate(str.maketrans({"*": "", "_": "", "~": ""}))
 
 
-def _short_description(value: str, max_len: int = 180) -> str:
+def _short_description(value: str, max_len: int = 120) -> str:
     """Return one compact, WhatsApp-safe description for the selected post."""
     text = _clean(value)
     if not text:
@@ -50,11 +50,9 @@ def build_status_message(post: dict) -> str:
     url = str(post.get("url", "")).strip()
     return "\n".join(
         [
+            url,
             f"*{title}*",
             description,
-            "",
-            "Lee el artículo completo 👇",
-            url,
         ]
     )
 

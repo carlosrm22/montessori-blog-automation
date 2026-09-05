@@ -26,14 +26,21 @@ class DailyStatusSuggestionTests(unittest.TestCase):
     def test_message_contains_title_description_and_article_url(self):
         message = daily.build_status_message(self._post())
         self.assertNotIn("Lectura del día", message)
-        self.assertTrue(message.startswith("*Ambiente preparado*"))
+        self.assertTrue(
+            message.startswith("https://montessorimexico.org/post-7/\n")
+        )
         self.assertIn("*Ambiente preparado*", message)
         self.assertIn(
             "Una reflexión práctica para acompañar a niñas y niños.", message
         )
-        self.assertIn("Lee el artículo completo 👇", message)
         self.assertIn("https://montessorimexico.org/post-7/", message)
+        self.assertNotIn("Lee el artículo completo", message)
         self.assertNotIn("Listo para compartir", message)
+
+    def test_description_is_limited_to_120_characters(self):
+        description = daily._short_description("palabra " * 40)
+        self.assertLessEqual(len(description), 120)
+        self.assertTrue(description.endswith("…"))
 
     def test_message_uses_a_description_fallback_but_keeps_the_url(self):
         post = self._post()
