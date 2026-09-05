@@ -266,11 +266,20 @@ La unidad `systemd/montessori-weekly-digest.timer` lo ejecuta los viernes a las
 ### Sugerencia diaria para Estado de WhatsApp
 
 Todos los días se elige una publicación reciente distinta y se envía por mensaje
-privado de WhatsApp con portada, liga al inicio, título y una descripción de hasta
-120 caracteres. La
+privado de WhatsApp con portada, enlace corto de WordPress al inicio, título en
+negritas y una descripción de hasta 80 caracteres. El mensaje no añade encabezados,
+llamadas a la acción ni despedidas. La
 persona solo tiene que compartirla manualmente en su Estado. El historial se guarda en SQLite
 para no repetir publicaciones hasta agotar el catálogo reciente; después se
 reutiliza primero la que lleva más tiempo sin aparecer.
+
+Formato generado:
+
+```text
+https://montessorimexico.org/?p=1559
+*Título de la publicación*
+Descripción breve de hasta 80 caracteres.
+```
 
 Prueba sin enviar ni registrar:
 

@@ -26,20 +26,18 @@ class DailyStatusSuggestionTests(unittest.TestCase):
     def test_message_contains_title_description_and_article_url(self):
         message = daily.build_status_message(self._post())
         self.assertNotIn("Lectura del día", message)
-        self.assertTrue(
-            message.startswith("https://montessorimexico.org/post-7/\n")
-        )
+        self.assertTrue(message.startswith("https://montessorimexico.org/?p=7\n"))
         self.assertIn("*Ambiente preparado*", message)
         self.assertIn(
             "Una reflexión práctica para acompañar a niñas y niños.", message
         )
-        self.assertIn("https://montessorimexico.org/post-7/", message)
+        self.assertNotIn("https://montessorimexico.org/post-7/", message)
         self.assertNotIn("Lee el artículo completo", message)
         self.assertNotIn("Listo para compartir", message)
 
-    def test_description_is_limited_to_120_characters(self):
+    def test_description_is_limited_to_80_characters(self):
         description = daily._short_description("palabra " * 40)
-        self.assertLessEqual(len(description), 120)
+        self.assertLessEqual(len(description), 80)
         self.assertTrue(description.endswith("…"))
 
     def test_message_uses_a_description_fallback_but_keeps_the_url(self):
@@ -47,7 +45,12 @@ class DailyStatusSuggestionTests(unittest.TestCase):
         post["description"] = ""
         message = daily.build_status_message(post)
         self.assertIn("Una lectura para acompañar", message)
-        self.assertIn(post["url"], message)
+        self.assertIn("https://montessorimexico.org/?p=7", message)
+
+    def test_short_url_falls_back_to_canonical_url_for_invalid_post_id(self):
+        post = self._post()
+        post["id"] = None
+        self.assertEqual(daily._short_post_url(post), post["url"])
 
     @patch("daily_status_suggestion.state.mark_daily_share_sent")
     @patch("daily_status_suggestion.state.get_daily_share_history", return_value={})

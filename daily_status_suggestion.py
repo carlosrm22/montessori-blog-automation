@@ -6,6 +6,7 @@ import argparse
 import logging
 import re
 import sys
+from urllib.parse import urlsplit, urlunsplit
 
 import config
 import state
@@ -21,7 +22,7 @@ def _clean(value: str) -> str:
     return text.translate(str.maketrans({"*": "", "_": "", "~": ""}))
 
 
-def _short_description(value: str, max_len: int = 120) -> str:
+def _short_description(value: str, max_len: int = 80) -> str:
     """Return one compact, WhatsApp-safe description for the selected post."""
     text = _clean(value)
     if not text:
@@ -32,6 +33,16 @@ def _short_description(value: str, max_len: int = 120) -> str:
         return candidate
     shortened = candidate[: max_len - 1].rsplit(" ", 1)[0].rstrip(".,;: ")
     return f"{shortened or candidate[: max_len - 1]}…"
+
+
+def _short_post_url(post: dict) -> str:
+    """Build WordPress's compact ``?p=ID`` permalink on the post origin."""
+    canonical_url = str(post.get("url", "")).strip()
+    post_id = post.get("id")
+    parsed = urlsplit(canonical_url)
+    if type(post_id) is not int or post_id <= 0 or not parsed.scheme or not parsed.netloc:
+        return canonical_url
+    return urlunsplit((parsed.scheme, parsed.netloc, "/", f"p={post_id}", ""))
 
 
 def select_post(posts: list[dict], history: dict[int, str]) -> dict | None:
@@ -47,7 +58,7 @@ def select_post(posts: list[dict], history: dict[int, str]) -> dict | None:
 def build_status_message(post: dict) -> str:
     title = _clean(str(post.get("title", "")))
     description = _short_description(str(post.get("description", "")))
-    url = str(post.get("url", "")).strip()
+    url = _short_post_url(post)
     return "\n".join(
         [
             url,
