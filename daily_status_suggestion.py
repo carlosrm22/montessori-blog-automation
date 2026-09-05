@@ -21,7 +21,8 @@ def _clean(value: str) -> str:
     return text.translate(str.maketrans({"*": "", "_": "", "~": ""}))
 
 
-def _short_hook(value: str, max_len: int = 180) -> str:
+def _short_description(value: str, max_len: int = 180) -> str:
+    """Return one compact, WhatsApp-safe description for the selected post."""
     text = _clean(value)
     if not text:
         return "Una lectura para acompañar la reflexión y la práctica educativa."
@@ -45,14 +46,14 @@ def select_post(posts: list[dict], history: dict[int, str]) -> dict | None:
 
 def build_status_message(post: dict) -> str:
     title = _clean(str(post.get("title", "")))
-    hook = _short_hook(str(post.get("description", "")))
+    description = _short_description(str(post.get("description", "")))
     url = str(post.get("url", "")).strip()
     return "\n".join(
         [
             "📚 *Lectura del día*",
             "",
             f"*{title}*",
-            hook,
+            description,
             "",
             "Lee el artículo completo 👇",
             url,

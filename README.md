@@ -266,8 +266,8 @@ La unidad `systemd/montessori-weekly-digest.timer` lo ejecuta los viernes a las
 ### Sugerencia diaria para Estado de WhatsApp
 
 Todos los días se elige una publicación reciente distinta y se envía por mensaje
-privado de WhatsApp con portada, título, gancho breve y liga. La persona solo
-tiene que compartirla manualmente en su Estado. El historial se guarda en SQLite
+privado de WhatsApp con portada, título, descripción breve y liga al artículo. La
+persona solo tiene que compartirla manualmente en su Estado. El historial se guarda en SQLite
 para no repetir publicaciones hasta agotar el catálogo reciente; después se
 reutiliza primero la que lleva más tiempo sin aparecer.
 

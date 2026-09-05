@@ -23,12 +23,22 @@ class DailyStatusSuggestionTests(unittest.TestCase):
         history = {9: "2026-09-03T00:00:00Z", 8: "2026-08-30T00:00:00Z"}
         self.assertEqual(daily.select_post(posts, history)["id"], 8)
 
-    def test_message_is_ready_to_copy_to_status(self):
+    def test_message_contains_title_description_and_article_url(self):
         message = daily.build_status_message(self._post())
         self.assertIn("📚 *Lectura del día*", message)
         self.assertIn("*Ambiente preparado*", message)
+        self.assertIn(
+            "Una reflexión práctica para acompañar a niñas y niños.", message
+        )
         self.assertIn("Lee el artículo completo 👇", message)
         self.assertIn("https://montessorimexico.org/post-7/", message)
+
+    def test_message_uses_a_description_fallback_but_keeps_the_url(self):
+        post = self._post()
+        post["description"] = ""
+        message = daily.build_status_message(post)
+        self.assertIn("Una lectura para acompañar", message)
+        self.assertIn(post["url"], message)
 
     @patch("daily_status_suggestion.state.mark_daily_share_sent")
     @patch("daily_status_suggestion.state.get_daily_share_history", return_value={})
