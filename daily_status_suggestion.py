@@ -50,8 +50,6 @@ def build_status_message(post: dict) -> str:
     url = str(post.get("url", "")).strip()
     return "\n".join(
         [
-            "📚 *Lectura del día*",
-            "",
             f"*{title}*",
             description,
             "",

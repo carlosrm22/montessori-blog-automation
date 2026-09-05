@@ -25,7 +25,8 @@ class DailyStatusSuggestionTests(unittest.TestCase):
 
     def test_message_contains_title_description_and_article_url(self):
         message = daily.build_status_message(self._post())
-        self.assertIn("📚 *Lectura del día*", message)
+        self.assertNotIn("Lectura del día", message)
+        self.assertTrue(message.startswith("*Ambiente preparado*"))
         self.assertIn("*Ambiente preparado*", message)
         self.assertIn(
             "Una reflexión práctica para acompañar a niñas y niños.", message
