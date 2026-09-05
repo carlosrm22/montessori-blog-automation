@@ -57,8 +57,6 @@ def build_status_message(post: dict) -> str:
             "",
             "Lee el artículo completo 👇",
             url,
-            "",
-            "Listo para compartir en tu Estado de WhatsApp.",
         ]
     )
 

@@ -32,6 +32,7 @@ class DailyStatusSuggestionTests(unittest.TestCase):
         )
         self.assertIn("Lee el artículo completo 👇", message)
         self.assertIn("https://montessorimexico.org/post-7/", message)
+        self.assertNotIn("Listo para compartir", message)
 
     def test_message_uses_a_description_fallback_but_keeps_the_url(self):
         post = self._post()
